@@ -6,6 +6,7 @@ target
 __pycache__
 output
 logs
+test-reports
 
 # frontend folder -> frontend/.gitignore
 
