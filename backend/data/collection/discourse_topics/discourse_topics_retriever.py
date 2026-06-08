@@ -149,8 +149,8 @@ def fetch_topic_details(
 
         solutions = []
         for sol in solutions_list: 
-            sol = SolutionPost.from_dict(solutions_list[0])
-            solutions.append(sol)
+            solution = SolutionPost.from_dict(sol)
+            solutions.append(solution)
 
         # Build the topic's tree
         hierarchical_posts = build_topic_tree(posts)
