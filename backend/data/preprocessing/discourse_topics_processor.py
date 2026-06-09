@@ -33,12 +33,12 @@ def process_topics(topics: list[dict]):
         else:
             # Keeping comments with more than 2 approval reactions
             approval_reaction_ids = ["heart"]
-            for post in topic["posts"]:
+            for post in topic["posts"][1:]:
                 approval_reaction_found = 0
 
                 for r in post["reactions"]:
                     if r["id"] in approval_reaction_ids:
-                        approval_reaction_found += 1
+                        approval_reaction_found += r["count"]
 
                 if approval_reaction_found >= 2:
                     new_topic = {}

@@ -1,12 +1,11 @@
-import os
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
 from routers import auth
-
+from .verify_env import verify_env_variables
 from database import engine
 import models
+
+verify_env_variables()
 
 models.Base.metadata.create_all(bind=engine)
 

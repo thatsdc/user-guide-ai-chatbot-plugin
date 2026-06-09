@@ -1,26 +1,17 @@
 import os
 from langchain_core.documents import Document
-from langchain_chroma import Chroma
-from langchain_huggingface import HuggingFaceEmbeddings
 from pathlib import Path
-from ..tools.common import read_json_file, write_json_file
+from ..tools.common import read_json_file
 from ..models import DataSource
+from langchain_chroma import Chroma
+from .chromadb import get_vector_store
 
 
-def embedder(sources: list[DataSource], output_dir: Path):
+def embedder(sources: list[DataSource], output_dir: Path, vector_store: Chroma):
     """Start embedder."""
     CHUNKS_DIR = output_dir / "chunks"
-    CHROMA_DIR = output_dir / "production" / "chromadb"
 
     SOURCES = [*[s.value for s in sources], "code_blocks"]
-    embedding_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")  # 384 dim
-
-    vector_store = Chroma(
-        collection_name="persistent",
-        embedding_function=embedding_model,
-        persist_directory=str(CHROMA_DIR),
-        # host="" only if there's a chromadb instance running
-    )
 
     for source in SOURCES:
         SOURCE_CHUNKS_DIR = CHUNKS_DIR / source
@@ -41,7 +32,7 @@ def embedder(sources: list[DataSource], output_dir: Path):
         print(f"Embedding {source}: {chunks_length} chunks")
 
         batch_size = 5000
-        for i in range(0, len(chunks), batch_size):
+        for i in range(0, chunks_length, batch_size):
             batch = chunks[i : i + batch_size]
             batch_ids = chunk_ids[i : i + batch_size]
 
@@ -50,14 +41,17 @@ def embedder(sources: list[DataSource], output_dir: Path):
 
             # Add the new ones
             ids = vector_store.add_documents(batch, ids=batch_ids)
-            print(f"Stored {i + batch_size} chunks from {source}")
+
+            print(f"Stored [{i}/{chunks_length}] of {source}")
+        print(f"Stored [{chunks_length}/{chunks_length}] of {source}")
 
     print("CHUNKS EMBEDDED AND STORED: ", vector_store._collection.count())
 
 
 def start_embedder(sources: list[DataSource], output_dir: Path):
     print("--------- START EMBEDDING PHASE ---------")
-    embedder(sources, output_dir)
+    vector_store = get_vector_store()
+    embedder(sources, output_dir, vector_store)
     print("--------- END EMBEDDING PHASE ---------")
 
 

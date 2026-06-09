@@ -1,4 +1,4 @@
-from mock_collector_output_data import (
+from tests.mock_data.mock_collector_output_data import (
     COLLECTOR_OUTPUT_DISCOURSE_TOPICS,
     COLLECTOR_OUTPUT_PLUGIN_DOCS,
     COLLECTOR_OUTPUT_REDDIT_THREADS,
@@ -8,7 +8,7 @@ from pathlib import Path
 from data.collection.collectors import start_collectors
 from data.preprocessing.processors import start_processors
 from data.formatting.formatters import start_formatters
-from data.chunking.chunker import chunker
+from data.chunking.chunker import start_chunker
 from data.models import DataSource
 import json
 
@@ -35,10 +35,8 @@ def test_data_pipeline(tmp_path: Path):
         DataSource.REDDIT_THREADS: COLLECTOR_OUTPUT_REDDIT_THREADS,
     }
 
-    for source in SOURCES:
-        (raw_dir / f"{source.value}.json").write_text(
-            json.dumps(COLLECTOR_OUTPUTS[source])
-        )
+    for source, data in COLLECTOR_OUTPUTS.items():
+        (raw_dir / f"{source.value}.json").write_text(json.dumps(data))
 
     # Preprocessing Phase
     start_processors(SOURCES, output_dir)
@@ -47,7 +45,7 @@ def test_data_pipeline(tmp_path: Path):
     start_formatters(SOURCES, output_dir)
 
     # Chunking Phase
-    chunker(SOURCES, output_dir)
+    start_chunker(SOURCES, output_dir)
 
     # Verifying outputs (chunks)
     chunks_dir = output_dir / "chunks"

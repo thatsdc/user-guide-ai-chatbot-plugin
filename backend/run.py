@@ -47,6 +47,11 @@ def run():
             "Error: Virtual environment not found. Please run 'python run.py install' first."
         )
         sys.exit(1)
+
+    print("    Starting Docker services...")
+    subprocess.run(["docker", "compose", "up", "-d"], check=True, cwd=SCRIPT_DIR)
+    print("    Docker services started.")
+
     subprocess.run([str(PYTHON), str(SCRIPT_DIR / "main.py")], check=True)
 
 
@@ -67,7 +72,7 @@ def clean():
         print(f"    Removed {venv_path}")
 
     # Walk through the project and remove Python/testing caches
-    cache_dirs = {"__pycache__", ".pytest_cache", ".ruff_cache"}
+    cache_dirs = {"__pycache__", ".pytest_cache"}
     for root, dirs, _ in os.walk(SCRIPT_DIR):
         for d in list(dirs):
             if d in cache_dirs:
