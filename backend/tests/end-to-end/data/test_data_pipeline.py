@@ -13,7 +13,7 @@ from data.models import DataSource
 import json
 
 
-def test_end_to_end(tmp_path: Path):    
+def test_data_pipeline(tmp_path: Path):    
     SOURCES = [DataSource.JENKINS_DOCS, DataSource.PLUGIN_DOCS, DataSource.DISCOURSE_TOPICS, DataSource.REDDIT_THREADS]
 
     output_dir = tmp_path / "output" 
