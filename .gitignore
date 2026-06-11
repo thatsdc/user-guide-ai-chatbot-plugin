@@ -8,6 +8,7 @@ output
 logs
 test-reports
 chroma-data
+*.htpasswd
 
 # frontend folder -> frontend/.gitignore
 

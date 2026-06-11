@@ -2,9 +2,32 @@ import os
 import sys
 from dotenv import load_dotenv
 
+OPTIONAL_ENV_VARS = ["CHROMA_TOKEN"]
+
 REQUIRED_ENV_VARS = [
-    "CHROMADB_URL",
+    "CHROMA_HOST",
+    "CHROMA_PORT",
+    "CHROMA_SSL",
+    "DATABASE_URL",
+    "ALLOW_ORIGINS",
+    "HUGGING_FACE_EMBEDDING_NAME",
 ]
+
+
+def get_env(key: str, ok: bool = True) -> str:
+    clean_key = key.strip()
+    if not clean_key:
+        return ""
+
+    value = os.getenv(clean_key)
+
+    if not value:
+        if ok:
+            return ""
+        else:
+            raise Exception("Env value is empty")
+
+    return value
 
 
 def verify_env_variables():

@@ -4,7 +4,7 @@ from pathlib import Path
 from ..tools.common import read_json_file
 from ..models import DataSource
 from langchain_chroma import Chroma
-from .chromadb import get_vector_store
+from vectordb.vector_store import get_vector_store
 
 
 def embedder(sources: list[DataSource], output_dir: Path, vector_store: Chroma):
