@@ -10,6 +10,9 @@ test-reports
 qdrant_data
 *.htpasswd
 
+# frontend build
+webapp
+
 # frontend folder -> frontend/.gitignore
 
 # mvn hpi:run
