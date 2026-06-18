@@ -7,7 +7,7 @@ from pathlib import Path
 SCRIPT_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 
 # Detect the operating system to set the correct virtual environment directory
-IS_WINDOWS = os.name == "nt"
+IS_WINDOWS = sys.platform == "win32"
 VENV_SUBDIR = ".venv/Scripts" if IS_WINDOWS else ".venv/bin"
 
 # Define paths to executables inside the virtual environment
@@ -31,8 +31,15 @@ def install():
         [str(PYTHON), "-m", "pip", "install", "--upgrade", "pip"], check=True
     )
 
-    req = SCRIPT_DIR / "requirements.txt"
+    file_name = "requirements.txt"
+
+    if IS_WINDOWS:
+        file_name = "requirements-windows.txt"
+        
+    req = SCRIPT_DIR / file_name
+
     if req.exists():
+        print(f"--> Installing from dependencies from {file_name} file.")
         subprocess.run(
             [str(PYTHON), "-m", "pip", "install", "-r", str(req)], check=True
         )
