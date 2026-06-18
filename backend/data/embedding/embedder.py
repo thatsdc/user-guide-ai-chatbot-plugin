@@ -4,7 +4,6 @@ from langchain_qdrant import QdrantVectorStore
 from pathlib import Path
 from ..tools.common import read_json_file
 from ..models import DataSource
-from vectordb.vector_store import get_vector_store
 from dotenv import load_dotenv
 
 
@@ -52,6 +51,8 @@ def embedder(sources: list[DataSource], output_dir: Path, vector_store: QdrantVe
 
 
 def start_embedder(sources: list[DataSource], output_dir: Path):
+    from vectordb.vector_store import get_vector_store
+    
     print("--------- START EMBEDDING PHASE ---------")
     vector_store = get_vector_store()
     embedder(sources, output_dir, vector_store)

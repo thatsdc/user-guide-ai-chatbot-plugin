@@ -18,6 +18,8 @@ def ephemeral_vector_db():
         vectors_config=VectorParams(size=VECTOR_SIZE, distance=Distance.COSINE),
     )
 
+    print("CLIENT: ", client)
+
     temporary_db = QdrantVectorStore(
         client=client,
         collection_name=COLLECTION_NAME,
