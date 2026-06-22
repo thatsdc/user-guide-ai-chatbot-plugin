@@ -1,8 +1,5 @@
 <?jelly escape-by-default="false"?>
 <j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define" xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form">
-    <div id="jenkins-ai-chatbot-root" />
-    <script>
-        window.jenkinsAIContext = ${it.currentContext}
-    </script>
-    <script src="${resURL}/plugin/user-guide-ai-chatbot/js/bundle.js" type="text/javascript"/>
+    <div id="jenkins-ai-chatbot-root" data-plugin-base-url="${resURL}/plugin/user-guide-ai-chatbot"></div>
+    <script src="${resURL}/plugin/user-guide-ai-chatbot/js/bundle.js" type="text/javascript"></script>
 </j:jelly>
