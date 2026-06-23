@@ -18,6 +18,9 @@ class ContextResponse(BaseModel):
 # CHAT SCHEMAS
 # ==========================================
 
+# Data required to create a new chat
+class ChatCreateRequest(BaseModel):
+    title: str
 
 class ChatTitleUpdateRequest(BaseModel):
     new_title: str

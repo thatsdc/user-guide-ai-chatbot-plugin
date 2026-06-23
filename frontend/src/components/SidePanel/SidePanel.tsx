@@ -1,4 +1,3 @@
-
 export default function SidePanel({
   toggleChat,
   isOpen,
@@ -8,7 +7,7 @@ export default function SidePanel({
 }) {
   return (
     isOpen && (
-    // @ts-ignore
+      // @ts-ignore
       <div style={styles.chatWindow}>
         <div style={styles.header}>
           <strong>AI Assistant</strong>
