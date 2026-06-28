@@ -4,7 +4,6 @@
          data-plugin-base-url="${resURL}/plugin/user-guide-ai-chatbot"
          data-api-url="${rootURL}/chatbot-api/proxy"
          data-crumb-header="${h.getCrumbRequestField()}"
-         data-crumb-value="${h.getCrumb(request)}"
-    />
-    <script src="${resURL}/plugin/user-guide-ai-chatbot/js/bundle.js" type="text/javascript" />
+         data-crumb-value="${h.getCrumb(request)}"/>
+    <script src="${resURL}/plugin/user-guide-ai-chatbot/js/bundle.js" type="text/javascript"/>
 </j:jelly>

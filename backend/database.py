@@ -10,12 +10,11 @@ POSTGRES_URL = get_env("POSTGRES_URL")
 db_engine = create_async_engine(POSTGRES_URL, echo=False)
 
 AsyncSessionLocal = async_sessionmaker(
-    bind=db_engine, 
-    class_=AsyncSession, 
-    expire_on_commit=False
+    bind=db_engine, class_=AsyncSession, expire_on_commit=False
 )
 
 Base = declarative_base()
+
 
 async def get_database_session():
     """

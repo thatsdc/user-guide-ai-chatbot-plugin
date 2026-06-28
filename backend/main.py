@@ -5,10 +5,10 @@ from contextlib import asynccontextmanager
 from database import db_engine, Base
 from fastapi import FastAPI
 
-
 verify_env_variables()
 
 ALLOW_ORIGINS = get_env_as_list("ALLOW_ORIGINS")
+
 
 @asynccontextmanager
 async def app_lifespan(app: FastAPI):
@@ -16,20 +16,19 @@ async def app_lifespan(app: FastAPI):
     Code executed exactly once before the application starts receiving requests.
     """
     print("[*] Initializing database connection and creating tables...")
-    
+
     async with db_engine.begin() as connection:
         await connection.run_sync(Base.metadata.create_all)
-        
+
     print("[+] Database tables are ready!")
-    
+
     yield
-    
+
     print("[*] Shutting down application and closing database engine...")
     await db_engine.dispose()
 
- 
-app = FastAPI(title="user-guide-ai-chatbot-plugin",
-              lifespan=app_lifespan)
+
+app = FastAPI(title="user-guide-ai-chatbot-plugin", lifespan=app_lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -52,6 +51,8 @@ app.include_router(context.router)
 async def health():
     return {"status": "ok"}
 
+
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run("main:app", host="127.0.0.1", port=5000, reload=True)

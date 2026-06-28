@@ -14,7 +14,7 @@ REQUIRED_ENV_VARS = [
     "POSTGRES_URL",
     "JWT_SECRET_KEY",
     "ALGORITHM",
-    "ACCESS_TOKEN_EXPIRE_MINUTES"
+    "ACCESS_TOKEN_EXPIRE_MINUTES",
 ]
 
 
@@ -30,7 +30,7 @@ def get_env(key: str, ok: bool = True) -> str:
             return ""
         else:
             raise Exception("Env value is empty")
-        
+
     return value
 
 
@@ -46,9 +46,8 @@ def get_env_as_list(key: str, ok: bool = True) -> list[str]:
             return []
         else:
             raise Exception("Env value is empty")
-        
-    return value.split(",")
 
+    return value.split(",")
 
 
 def verify_env_variables():

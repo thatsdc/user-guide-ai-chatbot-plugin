@@ -73,7 +73,6 @@ export default function ChatList({
           path: `chats?limit=${LIMIT}&offset=${currentOffset}`,
         });
 
-        // Ensure the response is OK before parsing JSON
         if (!response.ok) {
           throw new Error(`HTTP Error: ${response.status}`);
         }

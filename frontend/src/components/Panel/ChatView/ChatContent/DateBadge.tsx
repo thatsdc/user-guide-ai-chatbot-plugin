@@ -33,7 +33,7 @@ export default function DateBadge({
             boxShadow: 1,
           }}
         >
-          <Typography variant="caption" fontWeight="medium">
+          <Typography variant="caption" sx={{ fontWeight: "medium" }}>
             {visibleDate}
           </Typography>
         </Box>
