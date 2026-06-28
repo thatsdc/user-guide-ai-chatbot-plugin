@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from datetime import datetime
 from typing import List
 
@@ -33,6 +33,11 @@ class ChatResponse(BaseModel):
     # Enables automatic mapping from SQLAlchemy ORM objects
     model_config = ConfigDict(from_attributes=True)
 
+class PaginatedChatResponse(BaseModel):
+    items: List[ChatResponse] = Field(default_factory=list)
+    total_items: int
+    limit: int
+    offset: int
 
 # ==========================================
 # MESSAGE SCHEMAS
@@ -48,11 +53,13 @@ class MessageEditRequest(BaseModel):
 class QuestionResponse(BaseModel):
     id: int
     content: str
+    created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
 class AnswerResponse(BaseModel):
     id: int
     content: str
+    created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
 class QAPairResponse(BaseModel):
@@ -64,7 +71,7 @@ class QAPairResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 class PaginatedQAResponse(BaseModel):
-    items: List[QAPairResponse]
+    items: List[QAPairResponse] = Field(default_factory=list)
     total_items: int
     limit: int
     offset: int

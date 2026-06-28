@@ -35,25 +35,44 @@ async def create_new_chat(
     return new_chat_record
 
 
-@router.get("/", response_model=List[schemas.ChatResponse])
+@router.get("/", response_model=schemas.PaginatedChatResponse)
 async def get_my_chats(
+    limit: int = Query(20, ge=1, le=100, description="Number of chats to return per page"),
+    offset: int = Query(0, ge=0, description="Number of chats to skip"),
     db_session: AsyncSession = Depends(get_database_session),
     current_user: User = Depends(get_current_user)
 ):
     """
-    Retrieves all active chats belonging to the authenticated user.
+    Retrieves the paginated list of active chats belonging to the authenticated user.
+    Ordered by the most recently updated chats first.
     Strictly filters out soft-deleted chats.
     """
-    query = select(models.ChatEntity).where(
+    count_query = select(func.count(models.ChatEntity.id)).where(
         models.ChatEntity.user_id == current_user.id,
         models.ChatEntity.deleted_at.is_(None)
-    ).order_by(models.ChatEntity.created_at.desc())
+    )
+    total_chats = (await db_session.execute(count_query)).scalar_one()
 
-    execution_result = await db_session.execute(query)
-    
-    user_chats = execution_result.scalars().all()
+    query = (
+        select(models.ChatEntity)
+        .where(
+            models.ChatEntity.user_id == current_user.id,
+            models.ChatEntity.deleted_at.is_(None)
+        )
+        .order_by(models.ChatEntity.updated_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
 
-    return user_chats
+ 
+    paginated_results = (await db_session.execute(query)).scalars().all()
+
+    return schemas.PaginatedChatResponse(
+        items=list(paginated_results),
+        total_items=total_chats,
+        limit=limit,
+        offset=offset
+    )
 
 
 @router.get("/{chat_id}", response_model=schemas.PaginatedQAResponse)

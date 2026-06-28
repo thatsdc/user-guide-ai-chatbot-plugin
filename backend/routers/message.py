@@ -1,5 +1,3 @@
-import models
-import schemas
 from database import get_database_session
 from routers.auth import get_current_user, User
 from datetime import datetime, timezone
@@ -9,11 +7,13 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from fastapi.responses import StreamingResponse
 from sqlalchemy import update
-import json
+import models
+import schemas
 import asyncio
+import json
+
 
 router = APIRouter(prefix="/messages", tags=["Messages & Generation"])
-
 
 async def generate_ai_answer_stream(question_text: str):
     """
@@ -91,6 +91,9 @@ async def send_message_stream(
         models.ChatEntity.deleted_at.is_(None)
     )
     chat = (await db_session.execute(chat_query)).scalars().first()
+
+    print("HERE")
+
     
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found or access denied.")
@@ -105,6 +108,7 @@ async def send_message_stream(
         content=payload.content
     )
     db_session.add(new_question)
+
     
     await db_session.commit()
 

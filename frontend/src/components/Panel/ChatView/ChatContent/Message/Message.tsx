@@ -1,17 +1,25 @@
 import { Box, Typography } from "@mui/material";
-import type { ChatMessage } from "../../../../types/types";
+import { AnswerEntity, QuestionEntity } from "../../../../../models/models";
 import EditInput from "./EditInput";
 import { useState } from "react";
 import MessageActions from "./MessageActions";
 
-interface MessageProps {
-  message: ChatMessage;
-  onRetry: (message: ChatMessage) => void;
-  onEditConfirm: (message: ChatMessage, newText: string) => void;
+interface QuestionMessageProps {
+  message: QuestionEntity;
+  onEditConfirm: (message: QuestionEntity, newText: string) => void;
+  onRetry?: never;
 }
 
-function formatTime(isoString: string) {
-  return new Date(isoString).toLocaleTimeString([], {
+interface AnswerMessageProps {
+  message: AnswerEntity;
+  onRetry: () => void;
+  onEditConfirm?: never;
+}
+
+export type MessageProps = QuestionMessageProps | AnswerMessageProps;
+
+function formatTime(date: Date) {
+  return date.toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -22,30 +30,30 @@ export default function Message({
   onRetry,
   onEditConfirm,
 }: MessageProps) {
-  const isUser = message.sender === "user";
+  const isUser = message instanceof QuestionEntity;
   const [copied, setCopied] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [editValue, setEditValue] = useState(message.text);
+  const [editValue, setEditValue] = useState(message.content);
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(message.text);
+    await navigator.clipboard.writeText(message.content);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };
 
   const handleStartEdit = () => {
-    setEditValue(message.text);
+    setEditValue(message.content);
     setIsEditing(true);
   };
 
   const handleCancelEdit = () => {
-    setEditValue(message.text);
+    setEditValue(message.content);
     setIsEditing(false);
   };
 
   const handleConfirmEdit = () => {
     const trimmed = editValue.trim();
-    if (!trimmed) return;
+    if (!trimmed || !onEditConfirm) return;
     onEditConfirm(message, trimmed);
     setIsEditing(false);
   };
@@ -94,7 +102,7 @@ export default function Message({
                 }),
           })}
         >
-          {message.text}
+          {message.content}
         </Box>
       )}
 
@@ -121,7 +129,7 @@ export default function Message({
             handleCopy={handleCopy}
             handleStartEdit={handleStartEdit}
             isUser={isUser}
-            onRetry={() => onRetry(message)}
+            onRetry={() => onRetry!()}
           />
         </Box>
       )}

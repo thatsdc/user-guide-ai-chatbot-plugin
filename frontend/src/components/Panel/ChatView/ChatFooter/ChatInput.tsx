@@ -1,27 +1,35 @@
 import { Box, TextField, IconButton } from "@mui/material";
 import SendIcon from "@mui/icons-material/Send";
-import type { SubmitEventHandler } from "react";
+import React from "react";
 
 export default function ChatInput({
   handleSendMessage,
   inputValue,
   setInputValue,
 }: {
-  handleSendMessage: SubmitEventHandler<HTMLFormElement>;
+  handleSendMessage: (prompt: string) => void;
   inputValue: string;
   setInputValue: (s: string) => void;
 }) {
+  const onSubmitHandler = (event: React.SubmitEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (inputValue.trim()) {
+      handleSendMessage(inputValue);
+    }
+  };
+
   return (
     <Box
       component="form"
-      onSubmit={handleSendMessage}
+      onSubmit={onSubmitHandler}
       sx={{
         p: 2,
         bgcolor: "background.paper",
         transition: (theme) => theme.transitions.create("background-color"),
       }}
     >
-      <Box sx={{ display: "flex", gap: 1 }}>
+      <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
         <TextField
           fullWidth
           size="small"
@@ -30,7 +38,7 @@ export default function ChatInput({
           placeholder="Write your message..."
           sx={{
             "& .MuiOutlinedInput-root": {
-              borderRadius: 3, // rounded-xl
+              borderRadius: 3,
               bgcolor: (theme) =>
                 theme.palette.mode === "light" ? "grey.50" : "grey.900",
             },
@@ -43,11 +51,12 @@ export default function ChatInput({
             bgcolor: "primary.main",
             color: "primary.contrastText",
             borderRadius: 3,
+            p: 1.3,
             "&:hover": {
               bgcolor: "primary.dark",
             },
           }}
-          aria-label="Invia messaggio"
+          aria-label="Send message"
         >
           <SendIcon fontSize="small" />
         </IconButton>

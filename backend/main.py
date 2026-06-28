@@ -1,13 +1,14 @@
-from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers import auth, chat, message, context
-from manage_env import verify_env_variables
+from manage_env import verify_env_variables, get_env_as_list
 from contextlib import asynccontextmanager
-import models
 from database import db_engine, Base
+from fastapi import FastAPI
+
 
 verify_env_variables()
 
+ALLOW_ORIGINS = get_env_as_list("ALLOW_ORIGINS")
 
 @asynccontextmanager
 async def app_lifespan(app: FastAPI):
@@ -17,12 +18,10 @@ async def app_lifespan(app: FastAPI):
     print("[*] Initializing database connection and creating tables...")
     
     async with db_engine.begin() as connection:
-        # This will safely create all tables that don't already exist
         await connection.run_sync(Base.metadata.create_all)
         
     print("[+] Database tables are ready!")
     
-    # Yield control back to FastAPI to start the server
     yield
     
     print("[*] Shutting down application and closing database engine...")
@@ -34,7 +33,7 @@ app = FastAPI(title="user-guide-ai-chatbot-plugin",
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=ALLOW_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -55,4 +54,4 @@ async def health():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="127.0.0.1", port=5173, reload=True)
+    uvicorn.run("main:app", host="127.0.0.1", port=5000, reload=True)

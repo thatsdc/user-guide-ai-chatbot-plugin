@@ -1,13 +1,12 @@
-import React, { type SubmitEventHandler } from "react";
 import ChatInput from "./ChatInput";
 import { ChatTools } from "./ChatTools";
 
 export default function ChatFooter({
-  handleSendMessage,
+  onSendMessage,
   inputValue,
   setInputValue,
 }: {
-  handleSendMessage: SubmitEventHandler<HTMLFormElement>;
+  onSendMessage: (prompt: string) => void;
   inputValue: string;
   setInputValue: (s: string) => void;
 }) {
@@ -17,7 +16,7 @@ export default function ChatFooter({
     <div>
       <ChatTools onAttachContext={onAttachContext} currentPageName="Sample" />
       <ChatInput
-        handleSendMessage={handleSendMessage}
+        handleSendMessage={onSendMessage}
         inputValue={inputValue}
         setInputValue={setInputValue}
       />

@@ -30,8 +30,25 @@ def get_env(key: str, ok: bool = True) -> str:
             return ""
         else:
             raise Exception("Env value is empty")
-
+        
     return value
+
+
+def get_env_as_list(key: str, ok: bool = True) -> list[str]:
+    clean_key = key.strip()
+    if not clean_key:
+        return []
+
+    value = os.getenv(clean_key)
+
+    if not value:
+        if ok:
+            return []
+        else:
+            raise Exception("Env value is empty")
+        
+    return value.split(",")
+
 
 
 def verify_env_variables():
