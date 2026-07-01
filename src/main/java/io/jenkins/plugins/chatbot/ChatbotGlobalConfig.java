@@ -10,6 +10,7 @@ import hudson.security.ACL;
 import jenkins.model.Jenkins;
 import org.kohsuke.stapler.DataBoundSetter;
 import org.kohsuke.stapler.QueryParameter;
+import org.kohsuke.stapler.interceptor.RequirePOST;
 import org.jenkinsci.Symbol;
 
 @Extension
@@ -47,7 +48,7 @@ public class ChatbotGlobalConfig extends GlobalConfiguration {
         save();
     }
 
-    // Automatically populates the dropdown menu in the Jenkins UI
+    @RequirePOST()
     public ListBoxModel doFillJwtSecretIdItems(@QueryParameter String jwtSecretId) {
         if (!Jenkins.get().hasPermission(Jenkins.ADMINISTER)) {
             return new StandardListBoxModel().includeCurrentValue(jwtSecretId);
