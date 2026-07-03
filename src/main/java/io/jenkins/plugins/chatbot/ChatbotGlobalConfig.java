@@ -1,20 +1,18 @@
 package io.jenkins.plugins.chatbot;
 
 import com.cloudbees.plugins.credentials.CredentialsMatchers;
-import hudson.Extension;
-import hudson.util.ListBoxModel;
-import jenkins.model.GlobalConfiguration;
 import com.cloudbees.plugins.credentials.common.StandardListBoxModel;
 import com.cloudbees.plugins.credentials.domains.URIRequirementBuilder;
-import org.jenkinsci.plugins.plaincredentials.StringCredentials;
+import hudson.Extension;
 import hudson.security.ACL;
+import hudson.util.ListBoxModel;
+import jenkins.model.GlobalConfiguration;
 import jenkins.model.Jenkins;
+import org.jenkinsci.Symbol;
+import org.jenkinsci.plugins.plaincredentials.StringCredentials;
 import org.kohsuke.stapler.DataBoundSetter;
 import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.interceptor.RequirePOST;
-import org.jenkinsci.Symbol;
-
-import java.util.regex.Matcher;
 
 @Extension
 @Symbol("chatbotConfig")
@@ -61,8 +59,7 @@ public class ChatbotGlobalConfig extends GlobalConfiguration {
                         Jenkins.get(),
                         StringCredentials.class,
                         URIRequirementBuilder.create().build(),
-                        CredentialsMatchers.always()
-                )
+                        CredentialsMatchers.always())
                 .includeCurrentValue(jwtSecretId);
     }
 

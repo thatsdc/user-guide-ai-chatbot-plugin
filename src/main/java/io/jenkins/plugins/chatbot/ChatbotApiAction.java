@@ -1,34 +1,32 @@
 package io.jenkins.plugins.chatbot;
 
+import com.auth0.jwt.JWT;
+import com.auth0.jwt.algorithms.Algorithm;
 import com.cloudbees.plugins.credentials.CredentialsMatchers;
+import com.cloudbees.plugins.credentials.CredentialsProvider;
 import com.cloudbees.plugins.credentials.domains.URIRequirementBuilder;
 import hudson.Extension;
 import hudson.model.RootAction;
-import org.kohsuke.stapler.StaplerRequest2;
-import org.kohsuke.stapler.StaplerResponse2;
-import jenkins.model.Jenkins;
-import com.cloudbees.plugins.credentials.CredentialsProvider;
-import org.jenkinsci.plugins.plaincredentials.StringCredentials;
 import hudson.security.ACL;
-
-import com.auth0.jwt.JWT;
-import com.auth0.jwt.algorithms.Algorithm;
-
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.Date;
 import java.util.Set;
+import jenkins.model.Jenkins;
+import org.jenkinsci.plugins.plaincredentials.StringCredentials;
+import org.kohsuke.stapler.StaplerRequest2;
+import org.kohsuke.stapler.StaplerResponse2;
 
 @Extension
 public class ChatbotApiAction implements RootAction {
 
-    final private String BASE_URL = "chatbot-api";
+    private final String BASE_URL = "chatbot-api";
 
     @Override
     public String getIconFileName() {
-        return null; 
+        return null;
     }
 
     @Override
@@ -41,7 +39,7 @@ public class ChatbotApiAction implements RootAction {
         return BASE_URL;
     }
 
-    private StringCredentials getCredentials(ChatbotGlobalConfig pluginConfig){
+    private StringCredentials getCredentials(ChatbotGlobalConfig pluginConfig) {
         String storedSecretId = pluginConfig.getJwtSecretId();
 
         if (storedSecretId == null) return null;
@@ -51,13 +49,11 @@ public class ChatbotApiAction implements RootAction {
                         StringCredentials.class,
                         Jenkins.get(),
                         ACL.SYSTEM2,
-                        URIRequirementBuilder.create().build()
-                ),
-                CredentialsMatchers.withId(storedSecretId)
-        );
+                        URIRequirementBuilder.create().build()),
+                CredentialsMatchers.withId(storedSecretId));
     }
 
-    private String generateToken(String secret, long ttl){
+    private String generateToken(String secret, long ttl) {
         Algorithm signingAlgorithm = Algorithm.HMAC256(secret);
 
         return JWT.create()
@@ -74,7 +70,7 @@ public class ChatbotApiAction implements RootAction {
     public void doDynamic(StaplerRequest2 request, StaplerResponse2 response) throws Exception {
 
         Jenkins.get().checkPermission(Jenkins.READ);
-        
+
         // Get Backend URL
         ChatbotGlobalConfig pluginConfig = ChatbotGlobalConfig.get();
 
@@ -124,7 +120,7 @@ public class ChatbotApiAction implements RootAction {
         if (stateChangingMethods.contains(currentMethod)) {
             proxyConnection.setDoOutput(true);
             try (InputStream clientRequestStream = request.getInputStream();
-                 OutputStream downstreamStream = proxyConnection.getOutputStream()) {
+                    OutputStream downstreamStream = proxyConnection.getOutputStream()) {
                 clientRequestStream.transferTo(downstreamStream);
             }
         }
@@ -139,8 +135,8 @@ public class ChatbotApiAction implements RootAction {
         }
 
         // Determine if the backend is returning a Server-Sent Events stream
-        boolean isServerSentEvents = downstreamContentType != null &&
-                downstreamContentType.toLowerCase().contains("text/event-stream");
+        boolean isServerSentEvents = downstreamContentType != null
+                && downstreamContentType.toLowerCase().contains("text/event-stream");
 
         if (isServerSentEvents) {
             // Prevent the browser and intermediate proxies from buffering the stream
@@ -150,8 +146,9 @@ public class ChatbotApiAction implements RootAction {
 
         // Return the payload back to the originating client
         try (InputStream downstreamResponseStream = (downstreamResponseCode >= 200 && downstreamResponseCode < 300)
-                ? proxyConnection.getInputStream() : proxyConnection.getErrorStream();
-             OutputStream clientOutputStream = response.getOutputStream()) {
+                        ? proxyConnection.getInputStream()
+                        : proxyConnection.getErrorStream();
+                OutputStream clientOutputStream = response.getOutputStream()) {
 
             if (downstreamResponseStream != null) {
                 if (isServerSentEvents) {
