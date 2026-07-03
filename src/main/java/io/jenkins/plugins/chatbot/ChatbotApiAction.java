@@ -22,7 +22,7 @@ import org.kohsuke.stapler.StaplerResponse2;
 @Extension
 public class ChatbotApiAction implements RootAction {
 
-    private final String BASE_URL = "chatbot-api";
+    private static final String BASE_URL = "chatbot-api";
 
     @Override
     public String getIconFileName() {
