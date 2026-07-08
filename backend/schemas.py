@@ -79,7 +79,7 @@ class QAPairResponse(BaseModel):
     chat_id: int
     created_at: datetime
     question: QuestionResponse
-    answer: AnswerResponse
+    answer: AnswerResponse | None
     model_config = ConfigDict(from_attributes=True)
 
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { ChatPlaceholder } from "./ChatPlaceholder/ChatPlaceholder";
 import ChatContent from "./ChatContent/ChatContent";
 import ChatFooter from "./ChatFooter/ChatFooter";
@@ -30,55 +30,66 @@ export default function ChatView({
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const fetchMessages = async () => {
-    setLoading(true);
+  const fetchMessages = useCallback(
+    async (pairOffset: number) => {
+      setLoading(true);
 
-    try {
-      const response = await apiCall({
-        method: "GET",
-        path: `chats/${activeChatId}?limit=${QA_PAIR_LIMIT}&offset=${offset}`,
-      });
+      try {
+        const response = await apiCall({
+          method: "GET",
+          path: `chats/${activeChatId}?limit=${QA_PAIR_LIMIT}&offset=${pairOffset}`,
+        });
 
-      if (!response.ok) {
-        throw new Error(`HTTP Error: ${response.status}`);
+        if (!response.ok) {
+          throw new Error(`HTTP Error: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        const newMessages = data["items"]
+          .map(
+            (el: {
+              id: number;
+              chat_id: number;
+              created_at: string;
+              question: { id: number; content: string; created_at: string };
+              answer?: { id: number; content: string; created_at: string };
+            }) => new QAPairEntity(el),
+          )
+          .reverse();
+
+        if (newMessages.length < QA_PAIR_LIMIT) {
+          setHasMoreOlder(false);
+        }
+
+        setOffset((old) => old + QA_PAIR_LIMIT);
+
+        setMessages((old) => {
+          const newState = [...newMessages, ...old];
+          return newState;
+        });
+      } catch (error) {
+        console.error("Failed to fetch older messages:", error);
+        setErrorMessage("Failed to load chat history. Please try again.");
+      } finally {
+        setLoading(false);
       }
+    },
+    [activeChatId],
+  );
 
-      const data = await response.json();
-
-      const newMessages = data["items"]
-        .map((el: any) => new QAPairEntity(el))
-        .reverse();
-
-      if (newMessages.length < QA_PAIR_LIMIT) {
-        setHasMoreOlder(false);
-      }
-
-      setOffset((old) => old + QA_PAIR_LIMIT);
-
-      setMessages((old) => {
-        const newState = [...newMessages, ...old];
-        return newState;
-      });
-    } catch (error) {
-      console.error("Failed to fetch older messages:", error);
-      setErrorMessage("Failed to load chat history. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const onLoadOlder = () => fetchMessages();
+  const onLoadOlder = () => fetchMessages(offset);
 
   useEffect(() => {
-    if (!isBotAnswering) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+    const initialFetch = async () => {
       setMessages([]);
       setOffset(0);
       setHasMoreOlder(true);
-    }
+      await fetchMessages(0);
+    };
 
-    if (activeChatId && hasMoreOlder) {
-      fetchMessages();
+    if (activeChatId && activeChatId !== messages[0]?.chatId) {
+      initialFetch();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeChatId]);
