@@ -1,6 +1,7 @@
 import os
 import sys
 from dotenv import load_dotenv
+import json
 
 OPTIONAL_ENV_VARS = ["QDRANT_SECRET_KEY"]
 
@@ -18,36 +19,24 @@ REQUIRED_ENV_VARS = [
 ]
 
 
-def get_env(key: str, ok: bool = True) -> str:
+def get_env(key: str) -> str:
     clean_key = key.strip()
-    if not clean_key:
-        return ""
-
-    value = os.getenv(clean_key)
-
-    if not value:
-        if ok:
-            return ""
-        else:
-            raise Exception("Env value is empty")
+    value = os.getenv(clean_key, "")
 
     return value
 
 
 def get_env_as_list(key: str, ok: bool = True) -> list[str]:
     clean_key = key.strip()
-    if not clean_key:
-        return []
+    json_value = os.getenv(clean_key, "[]")
 
-    value = os.getenv(clean_key)
-
-    if not value:
+    try:
+        return json.loads(json_value)
+    except:
         if ok:
             return []
         else:
-            raise Exception("Env value is empty")
-
-    return value.split(",")
+            raise Exception("Env list is formatted incorrectly")
 
 
 def verify_env_variables():
