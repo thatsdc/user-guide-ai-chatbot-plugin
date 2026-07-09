@@ -20,7 +20,7 @@ def fetch_topic_previews(
     page: int, base_url: str, search_filters: SearchFilters
 ) -> List[Dict]:
     """
-    Fetch a list of 30 topic summaries. 
+    Fetch a list of 30 topic summaries.
     If exceptions occur, retry execution up to 3 times.
     Wait 3.0 seconds after the exception occurs.
 
