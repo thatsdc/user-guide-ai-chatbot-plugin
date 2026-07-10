@@ -8,6 +8,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.URI;
+import java.util.ArrayList;
+import java.util.List;
 
 @Extension
 public class GlobalAiDecorator extends PageDecorator {
@@ -19,17 +21,21 @@ public class GlobalAiDecorator extends PageDecorator {
     }
 
     /**
-     * Determines the readable name of the page the user is currently viewing.
+     * Entry point for Jelly rendering. Automatically uses the active request path.
      */
     public String getCurrentScreenName() {
         StaplerRequest2 request = Stapler.getCurrentRequest2();
-        if (request == null) {
+        if (request == null || request.getPathInfo() == null) {
             return "Unknown Page";
         }
+        return getScreenNameFromPath(request.getPathInfo());
+    }
 
-        String path = request.getPathInfo();
-
-        if (path == null) {
+    /**
+     * Determines the readable name of the page the user is currently viewing.
+     */
+    public String getScreenNameFromPath(String path) {
+        if (path == null || path.isEmpty()) {
             return "Unknown Page";
         }
 
@@ -53,19 +59,10 @@ public class GlobalAiDecorator extends PageDecorator {
 
             // Job / Pipeline pages
             if (path.contains("/job/")) {
-                String[] urlSegments = path.split("/");
-                String targetJobName = null;
-                String buildNumber = null;
+                String[] result = getJobNameAndBuildNumber(path);
 
-                for (int i = 0; i < urlSegments.length; i++) {
-                    if ("job".equals(urlSegments[i]) && i + 1 < urlSegments.length) {
-                        targetJobName = urlSegments[i + 1];
-                    }
-                    // Check if the URL contains a build number (digits)
-                    if (targetJobName != null && i + 2 < urlSegments.length && urlSegments[i + 2].matches("\\d+")) {
-                        buildNumber = urlSegments[i + 2];
-                    }
-                }
+                String targetJobName = result[0];
+                String buildNumber = result[1];
 
                 if (targetJobName != null) {
                     if (path.endsWith("/configure")) {
@@ -90,6 +87,23 @@ public class GlobalAiDecorator extends PageDecorator {
         } catch (Exception e) {
             return "Unknown Page";
         }
+    }
+
+    public String[] getJobNameAndBuildNumber(String path){
+        String[] result = new String[2];
+        String[] urlSegments = path.split("/");
+
+        for (int i = 0; i < urlSegments.length; i++) {
+            if ("job".equals(urlSegments[i]) && i + 1 < urlSegments.length) {
+                result[0] = urlSegments[i + 1];
+            }
+            // Check if the URL contains a build number (digits)
+            if (result[0] != null && i + 2 < urlSegments.length && urlSegments[i + 2].matches("\\d+")) {
+                result[1] = urlSegments[i + 2];
+            }
+        }
+
+        return result;
     }
 
 }
