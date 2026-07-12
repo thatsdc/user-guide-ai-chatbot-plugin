@@ -12,21 +12,16 @@ import hudson.security.ACL;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
-import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Set;
-
-import hudson.util.VersionNumber;
 import jenkins.model.Jenkins;
-import net.sf.json.JSON;
+import net.sf.json.JSONObject;
 import org.jenkinsci.plugins.plaincredentials.StringCredentials;
 import org.kohsuke.stapler.StaplerRequest2;
 import org.kohsuke.stapler.StaplerResponse2;
-import net.sf.json.JSONObject;
 
 @Extension
 public class ChatbotApiAction implements RootAction {
@@ -73,7 +68,7 @@ public class ChatbotApiAction implements RootAction {
                 .sign(signingAlgorithm);
     }
 
-    public String getUIPath(StaplerRequest2 request) throws Exception{
+    public String getUIPath(StaplerRequest2 request) throws Exception {
         String currentUiPath = "/";
 
         String refererUrl = request.getHeader("Referer");
@@ -93,7 +88,6 @@ public class ChatbotApiAction implements RootAction {
         return currentUiPath.startsWith("/") ? currentUiPath : "/" + currentUiPath;
     }
 
-
     /**
      * Generates a cascading context payload using Jenkins built-in JSONObject map structure.
      */
@@ -104,7 +98,7 @@ public class ChatbotApiAction implements RootAction {
 
         String uiPath = null;
 
-        try{
+        try {
             uiPath = getUIPath(request);
         } catch (Exception e) {
             rootNode.put("contextParsingError", "Failed to parse referer: " + e.getMessage());
@@ -119,11 +113,11 @@ public class ChatbotApiAction implements RootAction {
         if (refererUrl != null && !refererUrl.isEmpty()) {
             try {
                 if (uiPath != null && uiPath.contains("/job/")) {
-                    String[] result = (decorator != null) ? decorator.getJobNameAndBuildNumber(uiPath): null;
+                    String[] result = (decorator != null) ? decorator.getJobNameAndBuildNumber(uiPath) : null;
                     String jobName = null;
                     String buildNumber = null;
 
-                    if (result != null){
+                    if (result != null) {
                         jobName = result[0];
                         buildNumber = result[1];
                     }
@@ -197,14 +191,11 @@ public class ChatbotApiAction implements RootAction {
 
         if (job.getClass().getSimpleName().contains("WorkflowJob")) {
             jobDetails.put("isPipeline", true);
-        }else{
+        } else {
             jobDetails.put("isPipeline", false);
         }
 
-        System.out.println(jobDetails);
-
         rootNode.put("jobDetails", jobDetails);
-
     }
 
     /**
@@ -225,14 +216,14 @@ public class ChatbotApiAction implements RootAction {
         if (previousRun != null) {
             JSONObject prevBuildDetails = new JSONObject();
             prevBuildDetails.put("number", previousRun.getNumber());
-            prevBuildDetails.put("result", previousRun.getResult() != null ? previousRun.getResult().toString() : "UNKNOWN");
+            prevBuildDetails.put(
+                    "result",
+                    previousRun.getResult() != null ? previousRun.getResult().toString() : "UNKNOWN");
             buildDetails.put("previousBuild", prevBuildDetails);
         }
 
-        System.out.println(buildDetails);
         rootNode.put("buildDetails", buildDetails);
     }
-
 
     /**
      * Helper utility to safely truncate long strings to preserve network efficiency.
@@ -243,15 +234,14 @@ public class ChatbotApiAction implements RootAction {
             return "";
         }
         if (rawValue.length() > maxLength) {
-            if(fromBottom) {
+            if (fromBottom) {
                 return "... [CONTENT TRUNCATED FOR PERFORMANCE]" + rawValue.substring(rawValue.length() - maxLength);
-            }else{
+            } else {
                 return rawValue.substring(0, maxLength) + "... [CONTENT TRUNCATED FOR PERFORMANCE]";
             }
         }
         return rawValue;
     }
-
 
     /**
      * Intercepts all requests matching /chatbot-api/* and acts as a proxy.
@@ -315,14 +305,15 @@ public class ChatbotApiAction implements RootAction {
             if (normalizedPath.startsWith(contextInjectionPath)) {
 
                 try (InputStream clientRequestStream = request.getInputStream();
-                     OutputStream downstreamStream = proxyConnection.getOutputStream()) {
+                        OutputStream downstreamStream = proxyConnection.getOutputStream()) {
 
-                    String requestBody = new String(clientRequestStream.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+                    String requestBody =
+                            new String(clientRequestStream.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
 
                     try {
                         // Parse the payload into a JSON object
-                        JSONObject payload = requestBody.isEmpty() ?
-                                new JSONObject() : JSONObject.fromObject(requestBody);
+                        JSONObject payload =
+                                requestBody.isEmpty() ? new JSONObject() : JSONObject.fromObject(requestBody);
 
                         // Generate the Jenkins context and parse it as a JSON object
                         JSONObject contextJson = gatherCurrentContext(request);
@@ -343,7 +334,7 @@ public class ChatbotApiAction implements RootAction {
 
             } else {
                 try (InputStream clientRequestStream = request.getInputStream();
-                     OutputStream downstreamStream = proxyConnection.getOutputStream()) {
+                        OutputStream downstreamStream = proxyConnection.getOutputStream()) {
                     clientRequestStream.transferTo(downstreamStream);
                 }
             }

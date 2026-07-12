@@ -7,10 +7,6 @@ import org.kohsuke.stapler.StaplerRequest2;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.net.URI;
-import java.util.ArrayList;
-import java.util.List;
-
 @Extension
 public class GlobalAiDecorator extends PageDecorator {
 
@@ -89,7 +85,7 @@ public class GlobalAiDecorator extends PageDecorator {
         }
     }
 
-    public String[] getJobNameAndBuildNumber(String path){
+    public String[] getJobNameAndBuildNumber(String path) {
         String[] result = new String[2];
         String[] urlSegments = path.split("/");
 
@@ -105,5 +101,4 @@ public class GlobalAiDecorator extends PageDecorator {
 
         return result;
     }
-
 }

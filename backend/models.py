@@ -1,4 +1,13 @@
-from sqlalchemy import Column, Integer, String, Text, ForeignKey, DateTime, JSON, Boolean
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    Text,
+    ForeignKey,
+    DateTime,
+    JSON,
+    Boolean,
+)
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from database import Base
@@ -23,12 +32,15 @@ class UserEntity(Base):
         "ChatEntity", back_populates="user", cascade="all, delete-orphan"
     )
 
+
 class ContextEntity(Base):
     __tablename__ = "contexts"
 
     id = Column(Integer, primary_key=True, index=True)
-    
-    chat_id = Column(Integer, ForeignKey("chats.id", ondelete="CASCADE"), unique=True, nullable=False)
+
+    chat_id = Column(
+        Integer, ForeignKey("chats.id", ondelete="CASCADE"), unique=True, nullable=False
+    )
 
     current_screen = Column(String(255), nullable=True)
     jenkins_version = Column(String(50), nullable=True)
@@ -36,7 +48,7 @@ class ContextEntity(Base):
     active_plugins = Column(JSON, nullable=True)
     master_node = Column(JSON, nullable=True)
 
-    job_details = Column(JSON, nullable=True)    
+    job_details = Column(JSON, nullable=True)
     build_details = Column(JSON, nullable=True)
     build_log_stored = Column(Boolean, default=True)
 
@@ -50,6 +62,7 @@ class ContextEntity(Base):
 
     # Relationship: 1 Context -> 1 Chat
     chat = relationship("ChatEntity", back_populates="context")
+
 
 class ChatEntity(Base):
     __tablename__ = "chats"
@@ -76,10 +89,10 @@ class ChatEntity(Base):
 
     # Relationship: 1 Chat -> 1 Context
     context = relationship(
-        "ContextEntity", 
-        back_populates="chat", 
-        uselist=False, 
-        cascade="all, delete-orphan"
+        "ContextEntity",
+        back_populates="chat",
+        uselist=False,
+        cascade="all, delete-orphan",
     )
 
 

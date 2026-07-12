@@ -18,7 +18,9 @@ from datetime import datetime
 router = APIRouter(prefix="/context", tags=["Chats Management"])
 
 
-async def manage_logs(logs_content: str | None, vector_store: QdrantVectorStore, chat_id: int) -> bool:
+async def manage_logs(
+    logs_content: str | None, vector_store: QdrantVectorStore, chat_id: int
+) -> bool:
 
     try:
         # Delete previous logs
@@ -27,48 +29,46 @@ async def manage_logs(logs_content: str | None, vector_store: QdrantVectorStore,
             points_selector=qmodels.Filter(
                 must=[
                     qmodels.FieldCondition(
-                        key="metadata.chat_id", 
-                        match=qmodels.MatchValue(value=chat_id)
+                        key="metadata.chat_id", match=qmodels.MatchValue(value=chat_id)
                     )
                 ]
-            )
+            ),
         )
-        print(f"Successfully deleted previous logs for chat {chat_id}")
 
-        if not logs_content: return False
+        if not logs_content:
+            return False
 
         text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1500,    
-            chunk_overlap=200, 
+            chunk_size=1500,
+            chunk_overlap=200,
             separators=[
-                r"\n(?=\[Pipeline\] stage)",           # 1. Prioritize splitting at new Jenkins stages
-                r"\n(?=\[?(?:ERROR|FATAL|Exception))", # 2. Keep errors at the start of a chunk
-                r"\n(?=\[?\d{4}-\d{2}-\d{2})",         # 3. Date timestamps (e.g., [2026-07-12)
-                r"\n(?=\[?\d{2}:\d{2}:\d{2})",         # 4. Time timestamps (e.g., 14:32:01)
-                "\n\n",                                # 5. Fallback: double newline
-                "\n",                                  # 6. Fallback: single newline
-                " "                                    # 7. Absolute fallback: spaces
+                r"\n(?=\[Pipeline\] stage)",  # 1. Prioritize splitting at new Jenkins stages
+                r"\n(?=\[?(?:ERROR|FATAL|Exception))",  # 2. Keep errors at the start of a chunk
+                r"\n(?=\[?\d{4}-\d{2}-\d{2})",  # 3. Date timestamps (e.g., [2026-07-12)
+                r"\n(?=\[?\d{2}:\d{2}:\d{2})",  # 4. Time timestamps (e.g., 14:32:01)
+                "\n\n",  # 5. Fallback: double newline
+                "\n",  # 6. Fallback: single newline
+                " ",  # 7. Absolute fallback: spaces
             ],
-            is_separator_regex=True
+            is_separator_regex=True,
         )
 
         raw_chunks: List[str] = text_splitter.split_text(logs_content)
         documents: List[Document] = []
-        
+
         for index, chunk in enumerate(raw_chunks):
             doc = Document(
                 page_content=chunk,
                 metadata={
                     "chat_id": chat_id,
                     "chunk_index": index,
-                    "source": "jenkins_build_log"
-                }
+                    "source": "jenkins_build_log",
+                },
             )
             documents.append(doc)
 
         if documents:
             await vector_store.aadd_documents(documents)
-            print(f"Successfully stored {len(documents)} log of chat {chat_id}")
 
         return True
 
@@ -78,19 +78,25 @@ async def manage_logs(logs_content: str | None, vector_store: QdrantVectorStore,
 
 
 async def store_context(
-    db_session: AsyncSession, 
+    db_session: AsyncSession,
     user_id: str,
-    chat_id: int, 
+    chat_id: int,
     context: schemas.JenkinsContext,
-    vector_store: QdrantVectorStore
+    vector_store: QdrantVectorStore,
 ) -> bool:
     try:
-        stmt = select(models.ChatEntity).options(selectinload(models.ChatEntity.context)).where(models.ChatEntity.id == chat_id, 
-                                                                                                models.ChatEntity.user_id == user_id,
-                                                                                                models.ChatEntity.deleted_at.is_(None),)
+        stmt = (
+            select(models.ChatEntity)
+            .options(selectinload(models.ChatEntity.context))
+            .where(
+                models.ChatEntity.id == chat_id,
+                models.ChatEntity.user_id == user_id,
+                models.ChatEntity.deleted_at.is_(None),
+            )
+        )
         result = await db_session.execute(stmt)
         target_chat = result.scalars().first()
-        
+
         if not target_chat:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -102,12 +108,15 @@ async def store_context(
         # Vectorize and store logs in Qdrant if they exist
         if context.build_details and context.build_details.console_log_tail:
             logs_content = context.build_details.console_log_tail
-            
+
         build_log_stored = await manage_logs(logs_content, vector_store, chat_id)
 
         context_data = context.model_dump(exclude_none=True)
 
-        if "build_details" in context_data and "console_log_tail" in context_data["build_details"]:
+        if (
+            "build_details" in context_data
+            and "console_log_tail" in context_data["build_details"]
+        ):
             del context_data["build_details"]["console_log_tail"]
 
         if target_chat.context:
@@ -121,11 +130,11 @@ async def store_context(
             active_plugins=context_data.get("active_plugins"),
             master_node=context_data.get("master_node"),
             job_details=context_data.get("job_details"),
-            build_details=context_data.get("build_details")
+            build_details=context_data.get("build_details"),
         )
 
         target_chat.context = new_context
-        
+
         await db_session.commit()
         return True
 
@@ -133,7 +142,7 @@ async def store_context(
         await db_session.rollback()
         print(f"Failed to store context for chat {chat_id}: {str(e)}")
         return False
-    
+
 
 @router.post(
     "/{chat_id}/",
@@ -144,11 +153,13 @@ async def upload_context(
     chat_id: int,
     payload: schemas.UploadContext,
     db_session: AsyncSession = Depends(get_database_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     vector_store = get_vector_store()
 
-    await store_context(db_session, str(current_user.id), chat_id, payload.jenkins_context, vector_store)
+    await store_context(
+        db_session, str(current_user.id), chat_id, payload.jenkins_context, vector_store
+    )
 
     return schemas.ContextResponse(success=True, received_data=payload.jenkins_context)
 
@@ -161,14 +172,20 @@ async def upload_context(
 async def get_last_context_upload(
     chat_id: int,
     db_session: AsyncSession = Depends(get_database_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
-    stmt = select(models.ChatEntity).options(selectinload(models.ChatEntity.context)).where(models.ChatEntity.id == chat_id, 
-                                                                                            models.ChatEntity.user_id == current_user.id,
-                                                                                            models.ChatEntity.deleted_at.is_(None))
+    stmt = (
+        select(models.ChatEntity)
+        .options(selectinload(models.ChatEntity.context))
+        .where(
+            models.ChatEntity.id == chat_id,
+            models.ChatEntity.user_id == current_user.id,
+            models.ChatEntity.deleted_at.is_(None),
+        )
+    )
     result = await db_session.execute(stmt)
     target_chat = result.scalars().first()
-    
+
     if not target_chat:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -176,6 +193,8 @@ async def get_last_context_upload(
         )
 
     if target_chat.context:
-        return schemas.LastContextUploadResponse(last_upload_at=target_chat.context.updated_at)
-    
+        return schemas.LastContextUploadResponse(
+            last_upload_at=target_chat.context.updated_at
+        )
+
     return schemas.LastContextUploadResponse(last_upload_at=None)
