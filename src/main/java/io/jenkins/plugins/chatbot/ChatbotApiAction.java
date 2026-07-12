@@ -172,8 +172,7 @@ public class ChatbotApiAction implements RootAction {
             JSONObject masterNode = new JSONObject();
             masterNode.put("executors", builtInComputer.getNumExecutors());
             masterNode.put("isOnline", builtInComputer.isOnline());
-            masterNode.put("Description", builtInComputer.getDescription());
-
+            masterNode.put("Description", "No description");
             rootNode.put("masterNode", masterNode);
         }
     }
