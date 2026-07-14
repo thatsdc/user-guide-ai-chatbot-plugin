@@ -165,7 +165,7 @@ async def upload_context(
 @router.get(
     "/{chat_id}/last-upload",
     response_model=schemas.LastContextUploadResponse,
-    status_code=status.HTTP_202_ACCEPTED,
+    status_code=status.HTTP_200_OK,
 )
 async def get_last_context_upload(
     chat_id: int,

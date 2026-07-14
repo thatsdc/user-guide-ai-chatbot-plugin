@@ -1,14 +1,5 @@
 package io.jenkins.plugins.chatbot;
 
-import com.auth0.jwt.JWT;
-import com.auth0.jwt.algorithms.Algorithm;
-import com.cloudbees.plugins.credentials.CredentialsMatchers;
-import com.cloudbees.plugins.credentials.CredentialsProvider;
-import com.cloudbees.plugins.credentials.domains.URIRequirementBuilder;
-import hudson.Extension;
-import hudson.PluginWrapper;
-import hudson.model.*;
-import hudson.security.ACL;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
@@ -17,11 +8,28 @@ import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.List;
 import java.util.Set;
-import jenkins.model.Jenkins;
-import net.sf.json.JSONObject;
+
 import org.jenkinsci.plugins.plaincredentials.StringCredentials;
 import org.kohsuke.stapler.StaplerRequest2;
 import org.kohsuke.stapler.StaplerResponse2;
+
+import com.auth0.jwt.JWT;
+import com.auth0.jwt.algorithms.Algorithm;
+import com.cloudbees.plugins.credentials.CredentialsMatchers;
+import com.cloudbees.plugins.credentials.CredentialsProvider;
+import com.cloudbees.plugins.credentials.domains.URIRequirementBuilder;
+
+import hudson.Extension;
+import hudson.PluginWrapper;
+import hudson.model.Computer;
+import hudson.model.Item;
+import hudson.model.Job;
+import hudson.model.PageDecorator;
+import hudson.model.RootAction;
+import hudson.model.Run;
+import hudson.security.ACL;
+import jenkins.model.Jenkins;
+import net.sf.json.JSONObject;
 
 @Extension
 public class ChatbotApiAction implements RootAction {
@@ -258,7 +266,7 @@ public class ChatbotApiAction implements RootAction {
         String targetBackendUrl = pluginConfig.getBackendUrl();
 
         if (targetBackendUrl == null) {
-            response.sendError(500, "Backend Url value is missing in Jenkins Global Settings.");
+            response.sendError(500, "Backend URL is missing in Jenkins Global Configuration.");
             return;
         }
 
@@ -294,7 +302,7 @@ public class ChatbotApiAction implements RootAction {
             proxyConnection.setRequestProperty("Content-Type", request.getContentType());
         }
 
-        Set<String> stateChangingMethods = Set.of("POST", "PUT", "PATCH", "DELETE");
+        Set<String> stateChangingMethods = Set.of("POST", "PUT", "DELETE");
         String currentMethod = request.getMethod().toUpperCase();
 
         if (stateChangingMethods.contains(currentMethod)) {
