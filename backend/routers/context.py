@@ -12,8 +12,6 @@ import models
 from sqlalchemy.orm import selectinload
 from sqlalchemy.future import select
 from qdrant_client.http import models as qmodels
-from uuid import uuid4
-from datetime import datetime
 
 router = APIRouter(prefix="/context", tags=["Chats Management"])
 
@@ -73,8 +71,8 @@ async def manage_logs(
         return True
 
     except Exception as e:
-        print(f"Failed to chunk and store logs in Qdrant. Error: {str(e)}")
-        raise e
+        print(f"Failed to chunk and store logs in Qdrant.")
+        return False
 
 
 async def store_context(
@@ -141,7 +139,7 @@ async def store_context(
     except Exception as e:
         await db_session.rollback()
         print(f"Failed to store context for chat {chat_id}: {str(e)}")
-        return False
+        raise e
 
 
 @router.post(
