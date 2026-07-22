@@ -77,7 +77,7 @@ def get_tool_list(chat_id: int, context: dict) -> list[BaseTool]:
     async def fetch_from_vectordb(query: str, data_source: str) -> str:
         """
         Query the vector database for official documentation and community Q&A.
-        Use this tool ONLY for general knowledge, syntax, or global Jenkins concepts.
+        Use this tool ONLY for Jenkins concepts.
         Do NOT use this tool to search for user-specific logs, job details, or local context.
 
         Args:

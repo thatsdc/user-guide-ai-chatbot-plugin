@@ -79,15 +79,16 @@ def process_doc(
     total_chunks = len(text_fragments)
 
     for current_index, text_fragment in enumerate(text_fragments):
-        chunk_id = CHUNK_ID_TEMPLATE.format(doc.id, current_index)
 
         # Build the exact metadata needed for the window logic
         chunk_metadata = {
             **doc.metadata,
             "chunk_index": current_index,
             "total_chunks": total_chunks,
-            "chunk_id": chunk_id,
+            "parent_id": doc.id,
         }
+
+        chunk_id = CHUNK_ID_TEMPLATE.format(doc.id, current_index)
 
         # Convert id to UUID (Deterministic). Necessary for Qdrant
         uuid_to_str = str(uuid5(NAMESPACE_DNS, chunk_id))
