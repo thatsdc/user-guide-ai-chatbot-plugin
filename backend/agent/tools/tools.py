@@ -244,7 +244,6 @@ def get_tool_list(chat_id: int, context: dict, user_query: str) -> list[BaseTool
     Returns a dynamic list of tools based on the available context.
     Avoids redundant database queries by using the pre-fetched context.
     """
-    available_tools = []
 
     @tool
     async def fetch_from_vectordb(query: str) -> str:
@@ -320,11 +319,6 @@ def get_tool_list(chat_id: int, context: dict, user_query: str) -> list[BaseTool
         print("OUTPUT: ", output)
         return output
 
-    available_tools.append(fetch_from_vectordb)
-
-    if not context:
-        return available_tools
-
     @tool
     async def get_general_jenkins_context() -> str:
         """
@@ -332,6 +326,9 @@ def get_tool_list(chat_id: int, context: dict, user_query: str) -> list[BaseTool
         Use this tool to find out the Jenkins version, the master configuration,
         system messages, and the current screen the user is viewing.
         """
+        if not context:
+            return "Error: Missing context or logs not found."
+        
         general_info = {
             "current_screen": context.get("current_screen", "Unknown"),
             "root_url": context.get("root_url", "Unknown"),
@@ -342,126 +339,52 @@ def get_tool_list(chat_id: int, context: dict, user_query: str) -> list[BaseTool
         }
         return json.dumps(general_info, indent=2)
 
-    available_tools.append(get_general_jenkins_context)
-
-    if context.get("active_plugins"):
-
-        @tool
-        async def get_installed_plugin_list() -> str:
-            """
-            Retrieve the complete list of plugins currently installed on the user's Jenkins instance.
-            Use this tool to verify if a specific plugin is available or to check plugin versions
-            before suggesting a solution that requires them.
-            """
-            return json.dumps(context["active_plugins"], indent=2)
-
-        available_tools.append(get_installed_plugin_list)
-
-    if context.get("job_details"):
-
-        @tool
-        async def get_job_details() -> str:
-            """
-            Retrieve the configuration details of the specific Jenkins Job/Pipeline the user is currently looking at.
-            Use this tool to inspect the pipeline definition, repository URLs, and config.xml.
-            Do NOT use this tool to find execution logs (use get_build_details instead).
-            """
-            return json.dumps(context["job_details"], indent=2)
-
-        available_tools.append(get_job_details)
-
-    if context.get("build_details"):
-
-        @tool
-        async def get_build_details(log_search_query: str) -> str:
-            """
-            Retrieve the execution details of the current Jenkins build (status, timestamp, duration) the user is currently looking at
-            AND search its console logs for specific errors or keywords.
-
-            Args:
-                log_search_query: A specific keyword or error type to search within the build logs
-                                  (e.g., "Exception", "NullPointer", "npm ERR!", "timeout").
-                                  If you need to search for errors you can pass "error".
-            """
-            logs = await get_build_logs(chat_id, log_search_query)
-
-            result = {"build_details": context["build_details"], "build_logs": logs}
-            return json.dumps(result, indent=2)
-
-        available_tools.append(get_build_details)
-
-    return available_tools
-
-
-if __name__ == "__main__":
-
-    async def fetch_from_vectordb(user_query: str, query: str) -> str:
+    @tool
+    async def get_installed_plugin_list() -> str:
         """
-        Query the vector database for official documentation and community Q&A.
-        Use this tool ONLY for Jenkins concepts.
-        Do NOT use this tool to search for user-specific logs, job details, or local context.
+        Retrieve the complete list of plugins currently installed on the user's Jenkins instance.
+        Use this tool to verify if a specific plugin is available or to check plugin versions
+        before suggesting a solution that requires them.
+        """
+
+        if not context.get("active_plugins"):
+            return "Error: Missing context or logs not found."
+
+        return json.dumps(context["active_plugins"], indent=2)
+
+
+    @tool
+    async def get_job_details() -> str:
+        """
+        Retrieve the configuration details of the specific Jenkins Job/Pipeline the user is currently looking at.
+        Use this tool to inspect the pipeline definition, repository URLs, and config.xml.
+        Do NOT use this tool to find execution logs (use get_build_details instead).
+        """
+        if not context.get("job_details"):
+            return "Error: Missing context or logs not found."
+
+
+        return json.dumps(context["job_details"], indent=2)
+
+
+    @tool
+    async def get_build_details(log_search_query: str) -> str:
+        """
+        Retrieve the execution details of the current Jenkins build (status, timestamp, duration) the user is currently looking at
+        AND search its console logs for specific errors or keywords.
 
         Args:
-            query: The search input (e.g., "How to write a declarative pipeline", "Docker plugin setup").
+            log_search_query: A specific keyword or error type to search within the build logs
+                                (e.g., "Exception", "NullPointer", "npm ERR!", "timeout").
+                                If you need to search for errors you can pass "error".
         """
+        if not context.get("build_details"):
+            return "Error: Missing context or logs not found."
 
-        k = 50 if ENABLE_RERANKING else 3
+        logs = await get_build_logs(chat_id, log_search_query)
 
-        documents = await hybrid_retriever(query=query, k=k)
+        result = {"build_details": context["build_details"], "build_logs": logs}
+        return json.dumps(result, indent=2)
 
-        # Rerank results
-        ordered_documents = documents
-        if ENABLE_RERANKING:
-            try:
-                ordered_documents: list[Document] = [
-                    data["document"]
-                    for data in get_reranked_documents(user_query, documents)
-                ]
-            except Exception as e:
-                print(e)
-                ordered_documents = documents
 
-        output = "These documents might be useful to answer user question:\n"
-        cb_useful = None
-
-        for i, v in enumerate(ordered_documents[:3]):
-            # Apply extended retrieval
-            related_id = v.metadata.get("related_id")
-            if related_id:
-                # If is a codeblock, check which is the related chunk and pass as if that
-                # one was fetched from the hybrid retriever
-                print("RELATED: ", related_id)
-                payload_filter = models.Filter(
-                    must=[models.HasIdCondition(has_id=[related_id])]
-                )
-
-                records, _ = get_with_metadata(payload_filter=payload_filter, limit=1)
-                docs = qdrant_record_to_langchain_doc(records)
-                if len(docs) == 0:
-                    continue
-                else:
-                    cb_useful = (v.metadata["parent_id"], v.metadata["chunk_index"])
-                    v = docs[0]
-
-            data_source = v.metadata.get("data_source")
-            retrieval_type = (
-                "parent"
-                if data_source == "discourse_topics" or data_source == "reddit_threads"
-                else "window"
-            )
-            final_text, _ = await retrieve_chunk_context(
-                v, retrieval_type, useful_cb=cb_useful
-            )
-
-            output += f"DOCUMENT {i}:\n{final_text}\n"
-
-        return output
-
-    user_query = "Show me a common Jenkins error log"
-    query = "error log"
-
-    async def run():
-        result = await fetch_from_vectordb(user_query=user_query, query=query)
-        print(result)
-
-    asyncio.run(run())
+    return [fetch_from_vectordb ,get_general_jenkins_context, get_installed_plugin_list,get_job_details, get_build_details]
