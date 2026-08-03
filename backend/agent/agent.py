@@ -41,6 +41,8 @@ AvailableTools = Literal[
     "get_installed_plugin_list",
     "get_job_details",
     "get_build_details",
+    "get_workspace_tree",
+    "get_workspace_file",
 ]
 
 
@@ -61,7 +63,6 @@ class RouterDecision(BaseModel):
 
 
 class Agent:
-
     def __init__(
         self, chat_id: int, prompt: str, context: dict, checkpointer: AsyncPostgresSaver
     ) -> None:
@@ -84,6 +85,7 @@ class Agent:
 
         self.checkpointer = checkpointer
         self.tools = get_tool_list(chat_id, context, prompt)
+        self.error_count = 0
 
     async def router_node(self, state: MessagesState) -> dict:
         """
@@ -99,14 +101,17 @@ class Agent:
                 content_upper = str(last_msg.content).upper()
                 
                 if "ERROR" in content_upper or "NOT FOUND" in content_upper or "MISSING" in content_upper:
-                    print(f"\n[CIRCUIT BREAKER] Tool failed ({last_msg.name}). Bypassing Router LLM to prevent loops.")
-                    
-                    fake_thought = "MISSING_CONTEXT: The tool returned an error or the context is missing. I must stop trying and alert the final agent."
-                    
-                    ai_msg = AIMessage(
-                        content=f"<thought>\n{fake_thought}\n</thought>\n[READY]"
-                    )
-                    return {"messages": [ai_msg]}
+                    self.error_count += 1
+
+                    if self.error_count > 1:
+                        print(f"\n[CIRCUIT BREAKER] Tool failed ({last_msg.name}). Bypassing Router LLM to prevent loops.")
+                        
+                        fake_thought = "MISSING_CONTEXT: The tool returned an error or the context is missing. I must stop trying and alert the final agent."
+                        
+                        ai_msg = AIMessage(
+                            content=f"<thought>\n{fake_thought}\n</thought>\n[READY]"
+                        )
+                        return {"messages": [ai_msg]}
 
 
         system_prompt = SystemMessage(content=ROUTER_SYSTEM_PROMPT)
