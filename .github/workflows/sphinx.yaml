@@ -1,26 +1,44 @@
 name: "Sphinx: Render docs"
 
-on: push
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write        
+      pull-requests: write  
     steps:
-    - uses: actions/checkout@v4
-      with:
-        persist-credentials: false
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
     - name: Build HTML
       uses: ammaraskar/sphinx-action@master
+
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: html-docs
         path: docs/build/html/
-    - name: Deploy
-      uses: peaceiris/actions-gh-pages@v3
-      if: github.ref == 'refs/heads/main'
+
+    # --- Push Main ---
+    - name: Deploy Production Docs
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      uses: peaceiris/actions-gh-pages@v4
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_dir: docs/build/html
+
+    # --- PR ---
+    - name: Deploy PR Preview
+      if: github.event_name == 'pull_request'
+      uses: rossjrw/deploy-pr-preview@v3
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        source-dir: docs/build/html
