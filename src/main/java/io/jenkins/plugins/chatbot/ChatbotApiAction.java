@@ -36,24 +36,21 @@ import jenkins.scm.RunWithSCM;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
 import org.jenkinsci.plugins.plaincredentials.StringCredentials;
+import org.jenkinsci.plugins.workflow.actions.WorkspaceAction;
+import org.jenkinsci.plugins.workflow.graph.FlowGraphWalker;
+import org.jenkinsci.plugins.workflow.graph.FlowNode;
+import org.jenkinsci.plugins.workflow.job.WorkflowRun;
 import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.StaplerRequest2;
 import org.kohsuke.stapler.StaplerResponse2;
 import hudson.model.Job;
 import hudson.model.Run;
 import hudson.model.AbstractBuild;
-import org.jenkinsci.plugins.workflow.job.WorkflowRun;
-import org.jenkinsci.plugins.workflow.graph.FlowGraphWalker;
-import org.jenkinsci.plugins.workflow.graph.FlowNode;
-import org.jenkinsci.plugins.workflow.actions.WorkspaceAction;
-
 
 @Extension
 public class ChatbotApiAction implements RootAction {
 
     private static final String BASE_URL = "chatbot-api";
-
-    @Override
     public String getIconFileName() {
         return null;
     }
@@ -580,7 +577,6 @@ public class ChatbotApiAction implements RootAction {
         proxyConnection.disconnect();
     }
 
-
     /**
      * Helper method to validate the JWT from the Authorization header
      * using the shared secret stored in the Jenkins global configuration.
@@ -614,9 +610,8 @@ public class ChatbotApiAction implements RootAction {
 
             // Verify the JWT signature
             Algorithm algorithm = Algorithm.HMAC256(sharedSecret);
-            JWTVerifier verifier = JWT.require(algorithm)
-                    .withIssuer("fastapi-backend")
-                    .build();
+            JWTVerifier verifier =
+                    JWT.require(algorithm).withIssuer("fastapi-backend").build();
 
             // If verification fails or token is expired, this throws a JWTVerificationException
             verifier.verify(token);
@@ -630,7 +625,6 @@ public class ChatbotApiAction implements RootAction {
             return false;
         }
     }
-
 
     /**
      * Helper method to retrieve a specific Run based on job name and build number.
@@ -658,9 +652,9 @@ public class ChatbotApiAction implements RootAction {
      * Retrieves the tree of all workspaces for a specific build.
      * Example URL: /chatbot/workspaceTree?jobName=my-pipeline&buildNumber=12
      */
-    public void doWorkspaceTree(StaplerRequest2 req, StaplerResponse2 rsp,
-                                @QueryParameter String jobName,
-                                @QueryParameter int buildNumber) throws Exception {
+    public void doWorkspaceTree(
+            StaplerRequest2 req, StaplerResponse2 rsp, @QueryParameter String jobName, @QueryParameter int buildNumber)
+            throws Exception {
 
         // Verify Authentication
         if (!isAuthorized(req)) {
@@ -753,11 +747,14 @@ public class ChatbotApiAction implements RootAction {
      * Reads the content of a specific file within a specific workspace.
      * Example URL: /chatbot/workspaceFile?jobName=my-pipeline&buildNumber=12&workspaceId=ws-pipeline-1&filePath=src/main/App.java
      */
-    public void doWorkspaceFile(StaplerRequest2 req, StaplerResponse2 rsp,
-                                @QueryParameter String jobName,
-                                @QueryParameter int buildNumber,
-                                @QueryParameter String workspaceId,
-                                @QueryParameter String filePath) throws Exception {
+    public void doWorkspaceFile(
+            StaplerRequest2 req,
+            StaplerResponse2 rsp,
+            @QueryParameter String jobName,
+            @QueryParameter int buildNumber,
+            @QueryParameter String workspaceId,
+            @QueryParameter String filePath)
+            throws Exception {
 
         // Verify Authentication
         if (!isAuthorized(req)) {
@@ -823,5 +820,4 @@ public class ChatbotApiAction implements RootAction {
 
         rsp.getWriter().write(result.toString());
     }
-
 }
