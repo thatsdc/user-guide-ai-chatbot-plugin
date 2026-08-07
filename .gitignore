@@ -10,8 +10,8 @@ docs/html
 docs/doctrees
 
 # backend folder
-.env.prod
 .env
+venv
 .venv
 __pycache__
 output
