@@ -4,8 +4,8 @@ target
 .deepeval
 
 # docs folder
-docs/html
-docs/doctrees
+docs/build/
+docs/_build/
 
 # backend folder
 .env.prod
