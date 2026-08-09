@@ -15,6 +15,7 @@ import hudson.model.Node;
 import hudson.model.PageDecorator;
 import hudson.model.ParameterValue;
 import hudson.model.ParametersAction;
+import hudson.model.PasswordParameterValue;
 import hudson.model.RootAction;
 import hudson.model.Run;
 import hudson.scm.ChangeLogSet;
@@ -269,8 +270,10 @@ public class ChatbotApiAction implements RootAction {
             jobDetails.put("description", limitStringSize(description, 1000, false));
         }
 
-        String configXml = job.getConfigFile().asString();
-        jobDetails.put("configXml", limitStringSize(configXml, 5000, false));
+        if (job.hasPermission(Item.CONFIGURE)) {
+            String configXml = job.getConfigFile().asString();
+            jobDetails.put("configXml", limitStringSize(configXml, 5000, false));
+        }
 
         // Pipeline vs Classic specific info
         if (job.getClass().getSimpleName().contains("WorkflowJob")) {
@@ -329,7 +332,12 @@ public class ChatbotApiAction implements RootAction {
             JSONObject params = new JSONObject();
             for (ParameterValue p : paramsAction.getParameters()) {
                 // parameter values can be strings, booleans, etc.
-                params.put(p.getName(), p.getValue());
+                if (p instanceof PasswordParameterValue) {
+                    params.put(p.getName(), "****");
+                } else {
+                    // parameter values can be strings, booleans, etc.
+                    params.put(p.getName(), p.getValue());
+                }
             }
             buildDetails.put("parameters", params);
         }

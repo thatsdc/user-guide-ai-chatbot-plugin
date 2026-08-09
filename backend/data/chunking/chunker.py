@@ -48,7 +48,7 @@ async def contextualize_chunk_list(
     )
 
     for i, c in enumerate(chunk_list):
-        entire_document = read_json_file(SOURCE_DIR / f"{c.metadata["parent_id"]}.json")
+        entire_document = read_json_file(SOURCE_DIR / f"{c.metadata['parent_id']}.json")
 
         new_chunk_content = await contextualize_chunk(
             entire_document["page_content"],

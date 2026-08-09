@@ -162,8 +162,8 @@ async def retrieve_chunk_context(
 
         # Handle the specific useful code block separately to avoid range overlap
         if (
-            useful_cb_parent_id
-            and useful_cb_chunk_index
+            useful_cb_parent_id is not None
+            and useful_cb_chunk_index is not None
             and useful_cb_parent_id in all_cb_ids
         ):
             # Remove it from the default IDs so it gets unique rules

@@ -16,7 +16,7 @@ def qdrant_record_to_langchain_doc(records: list[Record]) -> list[Document]:
 
         page_content = payload.pop("page_content", "")
 
-        metadata = {**payload["metadata"]}
+        metadata = {**payload.get("metadata", {})}
 
         docs.append(Document(id=r.id, page_content=page_content, metadata=metadata))
 
