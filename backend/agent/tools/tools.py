@@ -20,6 +20,7 @@ from ..utils import (
 import re
 from manage_env import get_env
 from routers.auth import create_access_token
+import asyncio
 
 ENABLE_RERANKING = get_env("ENABLE_RERANKING").lower() == "true"
 CODE_BLOCK_PLACEHOLDER_PATTERN = r"\[\[CODE_BLOCK_(\d+)\]\]"
@@ -324,7 +325,7 @@ def get_tool_list(chat_id: int, context: dict, user_query: str) -> list[BaseTool
         Args:
             query: The search input (e.g., "How to write a declarative pipeline", "Docker plugin setup").
         """
-        print("INPUT: ", query)
+        # print("INPUT: ", query)
         k = 50 if ENABLE_RERANKING else 3
 
         sources = ["jenkins_docs", "plugin_docs", "reddit_threads", "discourse_topics"]
@@ -385,7 +386,7 @@ def get_tool_list(chat_id: int, context: dict, user_query: str) -> list[BaseTool
 
             output += f"DOCUMENT {i}:\n{final_text}\n"
 
-        print("OUTPUT: ", output)
+        # print("OUTPUT: ", output)
         return output
 
     @tool

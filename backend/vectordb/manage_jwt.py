@@ -1,7 +1,5 @@
 import jwt
 import time
-from manage_env import get_env
-from dotenv import load_dotenv
 
 
 def generate_token(payload: dict, secret_key: str) -> str:

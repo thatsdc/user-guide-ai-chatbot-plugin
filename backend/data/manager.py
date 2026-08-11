@@ -9,6 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from .tools.common import write_json_file, datetime_serializer
 from .models import DataSource, DataPhase
+import asyncio
 
 
 def clear_terminal() -> None:
@@ -142,14 +143,13 @@ async def start_data_pipeline(selected_sources: list[DataSource], script_dir: Pa
     )
 
 
-def start_manager():
+async def start_manager():
     SCRIPT_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
     selected_sources = collector_menu()
 
     import asyncio
-
     asyncio.run(start_data_pipeline(selected_sources, SCRIPT_DIR))
 
 
 if __name__ == "__main__":
-    start_manager()
+    asyncio.run(start_manager())
