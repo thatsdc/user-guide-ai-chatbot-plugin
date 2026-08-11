@@ -1,6 +1,8 @@
 target
 
 # docs folder
+docs/_build
+docs/build
 docs/html
 docs/doctrees
 
@@ -9,6 +11,7 @@ docs/doctrees
 venv
 .venv
 __pycache__
+.pytest_cache
 output
 logs
 test_reports
@@ -34,3 +37,9 @@ work
 .settings
 .classpath
 .project
+
+# VScode
+.vscode
+
+# deepeval
+.deepeval

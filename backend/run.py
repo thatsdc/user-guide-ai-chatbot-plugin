@@ -32,9 +32,7 @@ def install():
     )
 
     # Installing requirements
-    subprocess.run(
-        [str(PYTHON), "-m", "pip", "install", ".[dev]"], check=True
-    )
+    subprocess.run([str(PYTHON), "-m", "pip", "install", ".[dev]"], check=True)
 
     print("--> Installation complete.")
 
@@ -127,9 +125,7 @@ def show_help():
     )
     print("  python run.py test        - Run the test suite with pytest")
     print("  python run.py format      - Format code with black")
-    print(
-        "  python run.py pre-commit  - Run tests and format"
-    )
+    print("  python run.py pre-commit  - Run tests and format")
     print(
         "  python run.py clean       - Remove virtual environment, caches, and temp files"
     )
