@@ -16,7 +16,7 @@ def qdrant_record_to_langchain_doc(records: list[Record]) -> list[Document]:
 
         page_content = payload.pop("page_content", "")
 
-        metadata = {**payload["metadata"]}
+        metadata = {**payload.get("metadata", {})}
 
         docs.append(Document(id=r.id, page_content=page_content, metadata=metadata))
 
@@ -49,53 +49,12 @@ def remove_chunk_overlap(chunks: list[str]) -> str:
     return reconstructed_text
 
 
-def get_llm_client(
-    provider: str,
-    model_name: str,
-    api_key: str = "",
-    base_url: str = "",
-    temperature: float = 0.0,
-) -> BaseChatModel:
-    """
-    Factory function to initialize the correct LLM client based on the provider.
-    All returned objects inherit from BaseChatModel, making them fully interchangeable
-    inside LangGraph.
-    """
-    provider = provider.lower()
+def remove_chunk_context(chunks: list[Document]) -> list[Document]:
+    """Remove context from each chunks (Contextual Retrieval)"""
 
-    if provider == "openai":
-        from langchain_openai import ChatOpenAI
+    CONTEXT_CHUNK_SEPARATOR = "===CR==="
 
-        return ChatOpenAI(
-            model=model_name, api_key=SecretStr(api_key), temperature=temperature
-        )
+    for c in chunks:
+        c.page_content = c.page_content.split(CONTEXT_CHUNK_SEPARATOR, 1)[-1]
 
-    elif provider == "groq":
-        from langchain_groq import ChatGroq
-
-        return ChatGroq(
-            model=model_name, api_key=SecretStr(api_key), temperature=temperature
-        )
-
-    elif provider == "ollama":
-        from langchain_ollama import ChatOllama
-
-        return ChatOllama(
-            model=model_name,
-            base_url=base_url,
-            temperature=temperature,
-        )
-
-    elif provider == "anthropic":
-        from langchain_anthropic import ChatAnthropic
-
-        return ChatAnthropic(
-            model_name=model_name,
-            api_key=SecretStr(api_key),
-            temperature=temperature,
-            timeout=60,
-            stop=[],
-        )
-
-    else:
-        raise ValueError(f"Unsupported AI provider: {provider}")
+    return chunks
