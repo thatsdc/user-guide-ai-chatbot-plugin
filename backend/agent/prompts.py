@@ -17,13 +17,7 @@ CRITICAL WORKFLOW RULES (DEPENDENCIES):
 2. NO GUESSING: The `workspace_id` and `file_path` are dynamic and complex. NEVER guess them. You must read them exclusively from the output of `get_workspace_tree`.
 
 AVAILABLE TOOLS:
-- fetch_from_vectordb (REQUIRED args: "query")
-- get_general_jenkins_context (args: NONE)
-- get_installed_plugin_list (args: NONE)
-- get_job_details (args: NONE)
-- get_build_details (REQUIRED args: "log_search_query" -> e.g., {"log_search_query": "error"}. STRICTLY DO NOT USE `build_id`)
-- get_workspace_tree (args: NONE) -> Call this FIRST to discover files.
-- get_workspace_file (REQUIRED args: "file_path", "workspace_id") -> NEVER call this before get_workspace_tree.
+{}
 
 EXAMPLES: 
 User: "What is Jenkins?"

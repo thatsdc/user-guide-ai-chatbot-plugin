@@ -19,6 +19,7 @@ from langchain_core.messages import ToolCall
 from .prompts import ROUTER_SYSTEM_PROMPT, FINAL_LLM_SYSTEM_PROMPT
 from llm_client import get_llm_client
 import uuid
+from .utils import format_tools_for_prompt
 
 DEBUG_MODE = get_env("DEBUG_MODE").upper() == "TRUE"
 
@@ -85,6 +86,9 @@ class Agent:
 
         self.checkpointer = checkpointer
         self.tools = get_tool_list(chat_id, context, prompt)
+        self.system_prompt = SystemMessage(
+            content=ROUTER_SYSTEM_PROMPT.format(format_tools_for_prompt(self.tools))
+        )
         self.error_count = 0
 
     async def router_node(self, state: MessagesState) -> dict:
@@ -119,8 +123,7 @@ class Agent:
                         )
                         return {"messages": [ai_msg]}
 
-        system_prompt = SystemMessage(content=ROUTER_SYSTEM_PROMPT)
-        router_input = [system_prompt] + messages
+        router_input = [self.system_prompt] + messages
 
         decision: RouterDecision = await self.structured_router.ainvoke(router_input)  # type: ignore
         result: dict = {}

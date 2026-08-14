@@ -2,6 +2,49 @@ from langchain_core.documents import Document
 from qdrant_client.conversions.common_types import Record
 from difflib import SequenceMatcher
 from typing import List, Dict, Any
+from langchain_core.tools import BaseTool
+
+
+def format_tools_for_prompt(tools: list[BaseTool]) -> str:
+    """
+    Iterates over a list of BaseTool objects and generates a formatted string.
+    Extracts custom instructions directly from the tool's description if 'HINT:' is present.
+    """
+    formatted_list = []
+
+    for tool in tools:
+        tool_name = tool.name
+        tool_args = tool.args
+
+        keys = (
+            [k for k in tool_args.keys() if k not in ["run_manager", "callbacks"]]
+            if tool_args
+            else []
+        )
+
+        if keys:
+            formatted_keys = ", ".join([f'"{k}"' for k in keys])
+            args_str = f"REQUIRED args: {formatted_keys}"
+        else:
+            args_str = "args: NONE"
+
+        tool_string = f"- {tool_name} ({args_str})"
+
+        # Parse the docstring (description) for the 'HINT:' keyword
+        description = tool.description
+        if "HINT:" in description:
+            # Split the string at 'HINT:' and take everything after it
+            extracted_hint = description.split("HINT:")[1].strip()
+
+            # In case there are multiple lines after the hint, extract only the first line
+            single_line_hint = extracted_hint.split("\n")[0].strip()
+
+            tool_string += f" -> {single_line_hint}"
+
+        formatted_list.append(tool_string)
+
+    # Join the elements with double newlines for clear spacing
+    return "\n\n".join(formatted_list)
 
 
 def qdrant_record_to_langchain_doc(records: list[Record]) -> list[Document]:

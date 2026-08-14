@@ -664,6 +664,8 @@ public class ChatbotApiAction implements RootAction {
             return;
         }
 
+        Jenkins.get().checkPermission(Jenkins.READ);
+
         rsp.setContentType("application/json");
 
         // Retrieve the specific build

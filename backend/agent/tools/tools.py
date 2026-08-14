@@ -150,7 +150,6 @@ async def retrieve_chunk_context(
     # 3. Aggregate all code block IDs to perform a single DB query
     all_cb_ids: set[str] = set()
     for c in chunks:
-        print(c)
         all_cb_ids.update(c.metadata.get("cb_ids", []))
 
     cb_index_to_text: dict[str, str] = {}
@@ -277,7 +276,7 @@ async def call_jenkins_api(
 
     try:
         # Generate the JWT token
-        jwt_token = create_access_token({})
+        jwt_token = create_access_token()
         headers = {
             "Authorization": f"Bearer {jwt_token}",
             "Content-Type": "application/json",
@@ -439,11 +438,14 @@ def get_tool_list(chat_id: int, context: dict, user_query: str) -> list[BaseTool
         """
         Retrieve the execution details of the current Jenkins build (status, timestamp, duration) the user is currently looking at
         AND search its console logs for specific errors or keywords.
+        build_id it's not needed.
 
         Args:
             log_search_query: A specific keyword or error type to search within the build logs
                                 (e.g., "Exception", "NullPointer", "npm ERR!", "timeout").
                                 If you need to search for errors you can pass "error".
+
+        HINT: e.g., {"log_search_query": "error"}. STRICTLY DO NOT USE `build_id`
         """
         if not context.get("build_details"):
             return "Error: Missing context, tell the user to try to upload the context and try again."
@@ -459,9 +461,7 @@ def get_tool_list(chat_id: int, context: dict, user_query: str) -> list[BaseTool
         Retrieves the directory tree of ALL workspaces associated with the current build.
         Use this to explore available files before reading their content.
 
-        Args:
-            query: Ignored, but required by the framework.
-            chat_id: The ID of the current chat.
+        HINT: Call this FIRST to discover files.
         """
         try:
             if not context or not context.get("build_details"):
@@ -495,7 +495,8 @@ def get_tool_list(chat_id: int, context: dict, user_query: str) -> list[BaseTool
         Args:
             file_path: The relative path of the file (e.g., 'src/main/java/App.java' or 'pom.xml')
             workspace_id: The workspace ID provided by get_workspace_tree() (e.g., 'ws-default' or 'ws-pipeline-1')
-            chat_id: The ID of the current chat.
+
+        HINT: NEVER call this before get_workspace_tree.
         """
 
         try:

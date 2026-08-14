@@ -73,8 +73,11 @@ async def get_current_user(
         return new_provisioned_user
 
 
-def create_access_token(payload: dict) -> str:
-    to_encode = payload.copy()
+def create_access_token(payload: dict | None = None) -> str:
+    to_encode = {}
+    if payload:
+        to_encode = payload.copy()
+
     iat = datetime.now(timezone.utc)
     exp = iat + timedelta(minutes=5)
     to_encode.update({"iat": iat, "exp": exp, "iss": "fastapi-backend"})
