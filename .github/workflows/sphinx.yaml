@@ -52,7 +52,7 @@ jobs:
       # --- PR PREVIEW DEPLOY (Executes only inside a Pull Request) ---
       - name: Deploy PR Preview
         if: github.event_name == 'pull_request'
-        uses: rossjrw/deploy-pr-preview@v3
+        uses: rossjrw/pr-preview-action@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           source-dir: docs/html/
