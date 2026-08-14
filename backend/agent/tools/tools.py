@@ -21,7 +21,6 @@ import re
 from manage_env import get_env
 from routers.auth import create_access_token
 
-
 ENABLE_RERANKING = get_env("ENABLE_RERANKING").lower() == "true"
 CODE_BLOCK_PLACEHOLDER_PATTERN = r"\[\[CODE_BLOCK_(\d+)\]\]"
 

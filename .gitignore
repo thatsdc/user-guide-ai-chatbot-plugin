@@ -6,6 +6,8 @@ target
 # docs folder
 docs/build/
 docs/_build/
+docs/html
+docs/doctrees
 
 # backend folder
 .env.prod
