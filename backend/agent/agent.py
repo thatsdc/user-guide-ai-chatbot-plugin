@@ -309,9 +309,14 @@ async def execute_agent_prod(
     context = await fetch_context_from_db(chat_id, db_session)
     app = Agent(chat_id, prompt, context, checkpointer).create_state_graph()
 
+    trace_metadata = {
+        "environment": "prod",
+    }
+
     execution_config: RunnableConfig = {
         "configurable": {"thread_id": str(chat_id)},
         "recursion_limit": 10,
+        "metadata": trace_metadata,
     }
 
     input_message: MessagesState = {"messages": [HumanMessage(content=prompt)]}
@@ -346,9 +351,14 @@ async def execute_agent_debug(
     context = await fetch_context_from_db(chat_id, db_session)
     app = Agent(chat_id, prompt, context, checkpointer).create_state_graph()
 
+    trace_metadata = {
+        "environment": "debug",
+    }   
+    
     execution_config: RunnableConfig = {
         "configurable": {"thread_id": str(chat_id)},
         "recursion_limit": 10,
+        "metadata": trace_metadata,
     }
 
     input_message: MessagesState = {"messages": [HumanMessage(content=prompt)]}

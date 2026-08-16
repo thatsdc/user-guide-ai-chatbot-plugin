@@ -79,7 +79,12 @@ async def execute_test_agent(prompt: str, chat_id: int = 999) -> tuple[str, list
 
     app = agent_instance.create_state_graph()
     input_state: MessagesState = {"messages": [HumanMessage(content=prompt)]}
-    execution_config: RunnableConfig = {"configurable": {"thread_id": str(chat_id)}}
+
+    trace_metadata = {
+        "environment": "eval",
+    }
+
+    execution_config: RunnableConfig = {"configurable": {"thread_id": str(chat_id)}, "metadata": trace_metadata}
 
     final_state = await app.ainvoke(input_state, config=execution_config)
 
