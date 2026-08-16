@@ -18,6 +18,9 @@ from .prompts import ROUTER_SYSTEM_PROMPT, FINAL_LLM_SYSTEM_PROMPT
 from llm_client import get_llm_client
 from langchain_core.tools import tool
 
+ENABLE_LANGFUSE = get_env("ENABLE_LANGFUSE").upper() == "TRUE"
+ENABLE_LANGSMITH = get_env("ENABLE_LANGSMITH").upper() == "TRUE"
+
 ROUTER_LLM_PROVIDER = get_env("ROUTER_LLM_PROVIDER")
 ROUTER_LLM_MODEL_NAME = get_env("ROUTER_LLM_MODEL_NAME")
 ROUTER_LLM_BASE_URL = get_env("ROUTER_LLM_BASE_URL")
