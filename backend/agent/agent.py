@@ -23,6 +23,9 @@ from .utils import format_tools_for_prompt
 
 DEBUG_MODE = get_env("DEBUG_MODE").upper() == "TRUE"
 
+ENABLE_LANGFUSE = get_env("ENABLE_LANGFUSE").upper() == "TRUE"
+ENABLE_LANGSMITH = get_env("ENABLE_LANGSMITH").upper() == "TRUE"
+
 ROUTER_LLM_PROVIDER = get_env("ROUTER_LLM_PROVIDER")
 ROUTER_LLM_MODEL_NAME = get_env("ROUTER_LLM_MODEL_NAME")
 ROUTER_LLM_BASE_URL = get_env("ROUTER_LLM_BASE_URL")
@@ -52,7 +55,7 @@ class RouterDecision(BaseModel):
     action: Literal["TOOL_CALL", "READY", "OUT_OF_SCOPE"] = Field(
         description="The action to take."
     )
-    # 2. Force the LLM to pick ONLY from the allowed list
+    # Force the LLM to pick ONLY from the allowed list
     tool_name: Optional[AvailableTools] = Field(
         default=None,
         description="If action is TOOL_CALL, the exact name of the tool to use. Otherwise, null.",
@@ -311,33 +314,53 @@ async def execute_agent_prod(
     context = await fetch_context_from_db(chat_id, db_session)
     app = Agent(chat_id, prompt, context, checkpointer).create_state_graph()
 
-    trace_metadata = {
-        "environment": "prod",
-    }
+    callbacks: list = []
+    metadata = {}
+    langfuse_handler = None
+    if ENABLE_LANGFUSE:
+        from langfuse.langchain import CallbackHandler
+
+        langfuse_handler = CallbackHandler()
+        callbacks.append(langfuse_handler)
+        metadata.update(
+            {"langfuse_session_id": str(chat_id), "langfuse_tags": ["prod"]}
+        )
+
+    if ENABLE_LANGSMITH:
+        metadata.update(
+            {
+                "environment": "prod",
+            }
+        )
 
     execution_config: RunnableConfig = {
         "configurable": {"thread_id": str(chat_id)},
         "recursion_limit": 10,
-        "metadata": trace_metadata,
+        "callbacks": callbacks,
+        "metadata": metadata,
     }
 
     input_message: MessagesState = {"messages": [HumanMessage(content=prompt)]}
 
-    async for stream_mode, payload in app.astream(
-        input_message, config=execution_config, stream_mode=["messages"]
-    ):
-        if stream_mode == "messages":
-            msg, metadata = payload
+    try:
+        async for stream_mode, payload in app.astream(
+            input_message, config=execution_config, stream_mode=["messages"]
+        ):
+            if stream_mode == "messages":
+                msg, metadata = payload
 
-            if isinstance(metadata, dict):
-                current_node = metadata.get("langgraph_node")
+                if isinstance(metadata, dict):
+                    current_node = metadata.get("langgraph_node")
 
-                if current_node == "generate_final_response":
-                    if isinstance(msg, BaseMessageChunk) and isinstance(
-                        msg.content, str
-                    ):
-                        if msg.content:
-                            yield msg.content
+                    if current_node == "generate_final_response":
+                        if isinstance(msg, BaseMessageChunk) and isinstance(
+                            msg.content, str
+                        ):
+                            if msg.content:
+                                yield msg.content
+
+    except Exception as e:
+        yield "\n\n**System Error:** The AI encountered an unexpected issue. Please try again."
 
 
 async def execute_agent_debug(
@@ -353,15 +376,33 @@ async def execute_agent_debug(
     context = await fetch_context_from_db(chat_id, db_session)
     app = Agent(chat_id, prompt, context, checkpointer).create_state_graph()
 
-    trace_metadata = {
-        "environment": "debug",
-    }   
-    
+    callbacks: list = []
+    metadata = {}
+    langfuse_handler = None
+    if ENABLE_LANGFUSE:
+        from langfuse.langchain import CallbackHandler
+
+        langfuse_handler = CallbackHandler()
+        callbacks.append(langfuse_handler)
+        metadata.update(
+            {"langfuse_session_id": str(chat_id), "langfuse_tags": ["debug"]}
+        )
+
+    if ENABLE_LANGSMITH:
+        metadata.update(
+            {
+                "environment": "debug",
+            }
+        )
+
     execution_config: RunnableConfig = {
         "configurable": {"thread_id": str(chat_id)},
         "recursion_limit": 10,
-        "metadata": trace_metadata,
+        "callbacks": callbacks,
+        "metadata": metadata,
     }
+
+    print(execution_config)
 
     input_message: MessagesState = {"messages": [HumanMessage(content=prompt)]}
 
@@ -372,76 +413,82 @@ async def execute_agent_debug(
 
     stream_node: Sequence[StreamMode] = ["messages", "updates"]
 
-    async for stream_mode, payload in app.astream(
-        input_message, config=execution_config, stream_mode=stream_node
-    ):
+    try:
+        async for stream_mode, payload in app.astream(
+            input_message, config=execution_config, stream_mode=stream_node
+        ):
 
-        # --- MESSAGES (Real-time token streaming for UI & Thoughts) ---
-        if stream_mode == "messages":
-            msg, metadata = payload
+            # --- MESSAGES (Real-time token streaming for UI & Thoughts) ---
+            if stream_mode == "messages":
+                msg, metadata = payload
 
-            if isinstance(metadata, dict):
-                current_node = metadata.get("langgraph_node")
+                if isinstance(metadata, dict):
+                    current_node = metadata.get("langgraph_node")
 
-                if current_node == "router":
-                    if (
-                        hasattr(msg, "content")
-                        and isinstance(msg.content, str)
-                        and msg.content
-                    ):
-                        if current_print_context != "router_thought":
-                            print("\n[ROUTER THOUGHT]: ", end="", flush=True)
-                            current_print_context = "router_thought"
-                        print(msg.content, end="", flush=True)
+                    if current_node == "router":
+                        if (
+                            hasattr(msg, "content")
+                            and isinstance(msg.content, str)
+                            and msg.content
+                        ):
+                            if current_print_context != "router_thought":
+                                print("\n[ROUTER THOUGHT]: ", end="", flush=True)
+                                current_print_context = "router_thought"
+                            print(msg.content, end="", flush=True)
 
-                    if hasattr(msg, "tool_call_chunks") and msg.tool_call_chunks:
-                        for chunk in msg.tool_call_chunks:
-                            if chunk.get("name"):
-                                print(
-                                    f"\n\n[ROUTER ACTION]: Preparing to call tool -> {chunk['name']}"
-                                )
-                                current_print_context = "router_action"
+                        if hasattr(msg, "tool_call_chunks") and msg.tool_call_chunks:
+                            for chunk in msg.tool_call_chunks:
+                                if chunk.get("name"):
+                                    print(
+                                        f"\n\n[ROUTER ACTION]: Preparing to call tool -> {chunk['name']}"
+                                    )
+                                    current_print_context = "router_action"
 
-                elif current_node == "generate_final_response":
-                    if isinstance(msg, BaseMessageChunk) and isinstance(
-                        msg.content, str
-                    ):
-                        if msg.content:
-                            yield msg.content
+                    elif current_node == "generate_final_response":
+                        if isinstance(msg, BaseMessageChunk) and isinstance(
+                            msg.content, str
+                        ):
+                            if msg.content:
+                                yield msg.content
 
-        # --- UPDATES (State transitions between nodes for Debugging) ---
-        elif stream_mode == "updates":
-            # payload is a dictionary representing what the node just returned
-            # Example: {"router": {"messages": [AIMessage(...)]}}
+            # --- UPDATES (State transitions between nodes for Debugging) ---
+            elif stream_mode == "updates":
+                # payload is a dictionary representing what the node just returned
+                # Example: {"router": {"messages": [AIMessage(...)]}}
 
-            for node_name, state_update in payload.items():
-                print(f"\n\n[STATE TRANSITION] >>> Node '{node_name}' finished.")
+                for node_name, state_update in payload.items():
+                    print(f"\n\n[STATE TRANSITION] >>> Node '{node_name}' finished.")
 
-                messages_added = state_update.get("messages", [])
+                    messages_added = state_update.get("messages", [])
 
-                # Ensure it's a list so we can iterate over it safely
-                if not isinstance(messages_added, list):
-                    messages_added = [messages_added]
+                    # Ensure it's a list so we can iterate over it safely
+                    if not isinstance(messages_added, list):
+                        messages_added = [messages_added]
 
-                for m in messages_added:
-                    msg_type = m.__class__.__name__
+                    for m in messages_added:
+                        msg_type = m.__class__.__name__
 
-                    # Truncate content to keep the console clean
-                    content_preview = str(m.content)[:150].replace("\n", " ")
-                    if len(str(m.content)) > 150:
-                        content_preview += "..."
+                        # Truncate content to keep the console clean
+                        content_preview = str(m.content)[:150].replace("\n", " ")
+                        if len(str(m.content)) > 150:
+                            content_preview += "..."
 
-                    print(f"  -> Added {msg_type}: {content_preview}")
+                        print(f"  -> Added {msg_type}: {content_preview}")
 
-                    # If the message contains tool calls, print them explicitly
-                    if hasattr(m, "tool_calls") and m.tool_calls:
-                        tools_requested = [tc["name"] for tc in m.tool_calls]
-                        print(f"  -> Tools Requested: {tools_requested}")
+                        # If the message contains tool calls, print them explicitly
+                        if hasattr(m, "tool_calls") and m.tool_calls:
+                            tools_requested = [tc["name"] for tc in m.tool_calls]
+                            print(f"  -> Tools Requested: {tools_requested}")
 
-                print("-" * 60)
-                current_print_context = "state_transition"
+                    print("-" * 60)
+                    current_print_context = "state_transition"
 
-    print("\n=== AGENT EXECUTION FINISHED ===\n")
+    except Exception as e:
+        print(f"\n[CRITICAL ERROR] Execution interrupted: {str(e)}")
+        yield "\n\n**System Error:** The AI encountered an unexpected issue. Please try again."
+
+    finally:
+        print("\n=== AGENT EXECUTION FINISHED ===\n")
 
 
 async def execute_agent(
