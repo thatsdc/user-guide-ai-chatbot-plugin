@@ -63,6 +63,9 @@ JUDGE_MODEL = CustomLangChainJudge(
     base_url=JUDGE_LLM_BASE_URL,
 )
 
+ENABLE_LANGFUSE = get_env("ENABLE_LANGFUSE").upper() == "TRUE"
+ENABLE_LANGSMITH = get_env("ENABLE_LANGSMITH").upper() == "TRUE"
+
 
 async def execute_test_agent(prompt: str, chat_id: int = 999) -> tuple[str, list[str]]:
     """
@@ -80,11 +83,30 @@ async def execute_test_agent(prompt: str, chat_id: int = 999) -> tuple[str, list
     app = agent_instance.create_state_graph()
     input_state: MessagesState = {"messages": [HumanMessage(content=prompt)]}
 
-    trace_metadata = {
-        "environment": "eval",
-    }
+    callbacks: list = []
+    metadata = {}
+    langfuse_handler = None
+    if ENABLE_LANGFUSE:
+        from langfuse.langchain import CallbackHandler
 
-    execution_config: RunnableConfig = {"configurable": {"thread_id": str(chat_id)}, "metadata": trace_metadata}
+        langfuse_handler = CallbackHandler()
+        callbacks.append(langfuse_handler)
+        metadata.update(
+            {"langfuse_session_id": str(chat_id), "langfuse_tags": ["eval"]}
+        )
+
+    if ENABLE_LANGSMITH:
+        metadata.update(
+            {
+                "environment": "eval",
+            }
+        )
+
+    execution_config: RunnableConfig = {
+        "configurable": {"thread_id": str(chat_id)},
+        "callbacks": callbacks,
+        "metadata": metadata,
+    }
 
     final_state = await app.ainvoke(input_state, config=execution_config)
 
