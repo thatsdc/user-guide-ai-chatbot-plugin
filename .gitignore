@@ -3,7 +3,9 @@ target
 # deepeval
 .deepeval
 
-# Docs
+# docs folder
+docs/build/
+docs/_build/
 docs/html
 docs/doctrees
 

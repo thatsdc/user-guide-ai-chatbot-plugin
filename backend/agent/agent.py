@@ -19,6 +19,7 @@ from langchain_core.messages import ToolCall
 from .prompts import ROUTER_SYSTEM_PROMPT, FINAL_LLM_SYSTEM_PROMPT
 from llm_client import get_llm_client
 import uuid
+from .utils import format_tools_for_prompt
 
 DEBUG_MODE = get_env("DEBUG_MODE").upper() == "TRUE"
 
@@ -41,6 +42,8 @@ AvailableTools = Literal[
     "get_installed_plugin_list",
     "get_job_details",
     "get_build_details",
+    "get_workspace_tree",
+    "get_workspace_file",
 ]
 
 
@@ -61,7 +64,6 @@ class RouterDecision(BaseModel):
 
 
 class Agent:
-
     def __init__(
         self, chat_id: int, prompt: str, context: dict, checkpointer: AsyncPostgresSaver
     ) -> None:
@@ -84,6 +86,10 @@ class Agent:
 
         self.checkpointer = checkpointer
         self.tools = get_tool_list(chat_id, context, prompt)
+        self.system_prompt = SystemMessage(
+            content=ROUTER_SYSTEM_PROMPT.format(format_tools_for_prompt(self.tools))
+        )
+        self.error_count = 0
 
     async def router_node(self, state: MessagesState) -> dict:
         """
@@ -91,8 +97,33 @@ class Agent:
         and we manually convert that decision into a proper LangChain ToolCall.
         """
         messages = state["messages"]
-        system_prompt = SystemMessage(content=ROUTER_SYSTEM_PROMPT)
-        router_input = [system_prompt] + messages
+
+        if messages:
+            last_msg = messages[-1]
+
+            if isinstance(last_msg, ToolMessage):
+                content_upper = str(last_msg.content).upper()
+
+                if (
+                    "ERROR" in content_upper
+                    or "NOT FOUND" in content_upper
+                    or "MISSING" in content_upper
+                ):
+                    self.error_count += 1
+
+                    if self.error_count > 1:
+                        print(
+                            f"\n[CIRCUIT BREAKER] Tool failed ({last_msg.name}). Bypassing Router LLM to prevent loops."
+                        )
+
+                        fake_thought = "MISSING_CONTEXT: The tool returned an error or the context is missing. I must stop trying and alert the final agent."
+
+                        ai_msg = AIMessage(
+                            content=f"<thought>\n{fake_thought}\n</thought>\n[READY]"
+                        )
+                        return {"messages": [ai_msg]}
+
+        router_input = [self.system_prompt] + messages
 
         decision: RouterDecision = await self.structured_router.ainvoke(router_input)  # type: ignore
         result: dict = {}
@@ -140,15 +171,21 @@ class Agent:
 
         dynamic_instruction = ""
 
-        if "[OUT OF SCOPE]" in last_content:
+        if "MISSING_CONTEXT" in last_content:
+            dynamic_instruction = (
+                "\n\nCRITICAL DIRECTIVE FROM ROUTER: "
+                "The required logs or context are missing. "
+                "You MUST answer EXACTLY with: 'I don't have context information about this, please upload the context and try again.'"
+                "Do NOT attempt to guess the solution."
+            )
+        elif "[OUT OF SCOPE]" in last_content:
             dynamic_instruction = (
                 "\n\nCRITICAL DIRECTIVE FROM ROUTER: "
                 "The user query is strictly OUT OF SCOPE. "
-                "You MUST politely decline to answer in a single sentence."
-                "Do NOT attempt to solve the issue or provide a tutorial."
+                "You MUST politely decline to answer in a single sentence. "
                 "Answer with: 'I cannot assist you with this question.'"
             )
-        if "[READY]" in last_content:
+        elif "[READY]" in last_content:
             dynamic_instruction = (
                 "\n\nCRITICAL DIRECTIVE FROM ROUTER: "
                 "The router found useful information to answer the user's question."

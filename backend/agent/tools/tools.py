@@ -8,14 +8,18 @@ from ..reranker import get_reranked_documents
 from manage_env import get_env
 from langchain_core.documents import Document
 from qdrant_client import models
-from typing import Literal
 from vectordb.qdrant import get_with_metadata
+import aiohttp
+from typing import Optional, Dict, Any, Union, Literal
 from ..utils import (
     qdrant_record_to_langchain_doc,
     remove_chunk_context,
     remove_chunk_overlap,
+    format_workspace_tree,
 )
 import re
+from manage_env import get_env
+from routers.auth import create_access_token
 
 ENABLE_RERANKING = get_env("ENABLE_RERANKING").lower() == "true"
 CODE_BLOCK_PLACEHOLDER_PATTERN = r"\[\[CODE_BLOCK_(\d+)\]\]"
@@ -146,7 +150,6 @@ async def retrieve_chunk_context(
     # 3. Aggregate all code block IDs to perform a single DB query
     all_cb_ids: set[str] = set()
     for c in chunks:
-        print(c)
         all_cb_ids.update(c.metadata.get("cb_ids", []))
 
     cb_index_to_text: dict[str, str] = {}
@@ -239,12 +242,77 @@ async def retrieve_chunk_context(
     return final_text_with_code, list(cb_index_to_text.values())
 
 
+async def call_jenkins_api(
+    endpoint: str, params: Optional[Dict[str, Any]] = None
+) -> Union[dict, list]:
+    """
+    Makes an asynchronous HTTP call to the Jenkins plugin using JWT authentication.
+
+    Args:
+        chat_id: The ID of the current chat.
+        endpoint: The API path (e.g., '/job/my-job/1/chatbot/workspaceTree').
+        params: Optional query parameters to append to the URL.
+
+    Returns:
+        A dictionary or list containing the JSON response from Jenkins.
+    """
+    jenkins_url = get_env("JENKINS_URL")
+
+    if not jenkins_url:
+        print("JENKINS_URL environment variable is missing!")
+        return {
+            "status": "error",
+            "message": "Jenkins server configuration is missing on the backend.",
+        }
+
+    base_url = jenkins_url.rstrip("/")
+    endpoint_path = endpoint.lstrip("/")
+    full_url = f"{base_url}/{endpoint_path}"
+
+    safe_params = {}
+    if params:
+        for key, value in params.items():
+            safe_params[key] = str(value)
+
+    try:
+        # Generate the JWT token
+        jwt_token = create_access_token()
+        headers = {
+            "Authorization": f"Bearer {jwt_token}",
+            "Content-Type": "application/json",
+        }
+
+        async with aiohttp.ClientSession(headers=headers) as session:
+            print(f"Calling Jenkins API: {full_url} with params: {safe_params}")
+
+            async with session.get(full_url, params=safe_params) as response:
+                response.raise_for_status()
+                return await response.json()
+
+    except ValueError as e:
+        print(str(e))
+        return {
+            "status": "error",
+            "message": "Backend configuration error (JWT Secret missing).",
+        }
+
+    except aiohttp.ClientResponseError as e:
+        print(f"HTTP Error {e.status} calling Jenkins: {e.message}")
+        return {
+            "status": "error",
+            "message": f"Error from Jenkins (HTTP {e.status}): {e.message}",
+        }
+
+    except Exception as e:
+        print(f"Unexpected error in call_jenkins_api: {str(e)}")
+        return {"status": "error", "message": f"Unexpected error: {str(e)}"}
+
+
 def get_tool_list(chat_id: int, context: dict, user_query: str) -> list[BaseTool]:
     """
     Returns a dynamic list of tools based on the available context.
     Avoids redundant database queries by using the pre-fetched context.
     """
-    available_tools = []
 
     @tool
     async def fetch_from_vectordb(query: str) -> str:
@@ -320,11 +388,6 @@ def get_tool_list(chat_id: int, context: dict, user_query: str) -> list[BaseTool
         print("OUTPUT: ", output)
         return output
 
-    available_tools.append(fetch_from_vectordb)
-
-    if not context:
-        return available_tools
-
     @tool
     async def get_general_jenkins_context() -> str:
         """
@@ -332,6 +395,9 @@ def get_tool_list(chat_id: int, context: dict, user_query: str) -> list[BaseTool
         Use this tool to find out the Jenkins version, the master configuration,
         system messages, and the current screen the user is viewing.
         """
+        if not context:
+            return "Error: Missing context, tell the user to try to upload the context and try again."
+
         general_info = {
             "current_screen": context.get("current_screen", "Unknown"),
             "root_url": context.get("root_url", "Unknown"),
@@ -342,126 +408,134 @@ def get_tool_list(chat_id: int, context: dict, user_query: str) -> list[BaseTool
         }
         return json.dumps(general_info, indent=2)
 
-    available_tools.append(get_general_jenkins_context)
-
-    if context.get("active_plugins"):
-
-        @tool
-        async def get_installed_plugin_list() -> str:
-            """
-            Retrieve the complete list of plugins currently installed on the user's Jenkins instance.
-            Use this tool to verify if a specific plugin is available or to check plugin versions
-            before suggesting a solution that requires them.
-            """
-            return json.dumps(context["active_plugins"], indent=2)
-
-        available_tools.append(get_installed_plugin_list)
-
-    if context.get("job_details"):
-
-        @tool
-        async def get_job_details() -> str:
-            """
-            Retrieve the configuration details of the specific Jenkins Job/Pipeline the user is currently looking at.
-            Use this tool to inspect the pipeline definition, repository URLs, and config.xml.
-            Do NOT use this tool to find execution logs (use get_build_details instead).
-            """
-            return json.dumps(context["job_details"], indent=2)
-
-        available_tools.append(get_job_details)
-
-    if context.get("build_details"):
-
-        @tool
-        async def get_build_details(log_search_query: str) -> str:
-            """
-            Retrieve the execution details of the current Jenkins build (status, timestamp, duration) the user is currently looking at
-            AND search its console logs for specific errors or keywords.
-
-            Args:
-                log_search_query: A specific keyword or error type to search within the build logs
-                                  (e.g., "Exception", "NullPointer", "npm ERR!", "timeout").
-                                  If you need to search for errors you can pass "error".
-            """
-            logs = await get_build_logs(chat_id, log_search_query)
-
-            result = {"build_details": context["build_details"], "build_logs": logs}
-            return json.dumps(result, indent=2)
-
-        available_tools.append(get_build_details)
-
-    return available_tools
-
-
-if __name__ == "__main__":
-
-    async def fetch_from_vectordb(user_query: str, query: str) -> str:
+    @tool
+    async def get_installed_plugin_list() -> str:
         """
-        Query the vector database for official documentation and community Q&A.
-        Use this tool ONLY for Jenkins concepts.
-        Do NOT use this tool to search for user-specific logs, job details, or local context.
+        Retrieve the complete list of plugins currently installed on the user's Jenkins instance.
+        Use this tool to verify if a specific plugin is available or to check plugin versions
+        before suggesting a solution that requires them.
+        """
+
+        if not context.get("active_plugins"):
+            return "Error: Missing context, tell the user to try to upload the context and try again."
+
+        return json.dumps(context["active_plugins"], indent=2)
+
+    @tool
+    async def get_job_details() -> str:
+        """
+        Retrieve the configuration details of the specific Jenkins Job/Pipeline the user is currently looking at.
+        Use this tool to inspect the pipeline definition, repository URLs, and config.xml.
+        Do NOT use this tool to find execution logs (use get_build_details instead).
+        """
+        if not context.get("job_details"):
+            return "Error: Missing context, tell the user to try to upload the context and try again."
+
+        return json.dumps(context["job_details"], indent=2)
+
+    @tool
+    async def get_build_details(log_search_query: str) -> str:
+        """
+        Retrieve the execution details of the current Jenkins build (status, timestamp, duration) the user is currently looking at
+        AND search its console logs for specific errors or keywords.
+        build_id it's not needed.
 
         Args:
-            query: The search input (e.g., "How to write a declarative pipeline", "Docker plugin setup").
+            log_search_query: A specific keyword or error type to search within the build logs
+                                (e.g., "Exception", "NullPointer", "npm ERR!", "timeout").
+                                If you need to search for errors you can pass "error".
+
+        HINT: e.g., {"log_search_query": "error"}. STRICTLY DO NOT USE `build_id`
+        """
+        if not context.get("build_details"):
+            return "Error: Missing context, tell the user to try to upload the context and try again."
+
+        logs = await get_build_logs(chat_id, log_search_query)
+
+        result = {"build_details": context["build_details"], "build_logs": logs}
+        return json.dumps(result, indent=2)
+
+    @tool
+    async def get_workspace_tree() -> str:
+        """
+        Retrieves the directory tree of ALL workspaces associated with the current build.
+        Use this to explore available files before reading their content.
+
+        HINT: Call this FIRST to discover files.
+        """
+        try:
+            if not context or not context.get("build_details"):
+                return "Error: Missing context, tell the user to try to upload the context and try again."
+
+            job_name = context["job_details"]["full_name"]
+            build_number = context["build_details"]["number"]
+
+            response = await call_jenkins_api(
+                endpoint="/chatbot-api/workspaceTree",
+                params={"jobName": job_name, "buildNumber": build_number},
+            )
+
+            if isinstance(response, dict) and response.get("status") == "error":
+                return f"API Error: {response.get('message')}"
+
+            formatted_tree = format_workspace_tree(response)  # type: ignore
+            return formatted_tree
+
+        except Exception as e:
+            print(f"Failed to fetch workspace tree: {e}")
+            return f"Error retrieving workspace tree: {str(e)}"
+
+    @tool
+    async def get_workspace_file(file_path: str, workspace_id: str) -> str:
+        """
+        Reads the content of a specific file within a Jenkins workspace.
+        Do NOT call this tool until you have called get_workspace_tree().
+        You MUST call get_workspace_tree() tool first to obtain the correct 'workspace_id' and exact 'file_path'.
+
+        Args:
+            file_path: The relative path of the file (e.g., 'src/main/java/App.java' or 'pom.xml')
+            workspace_id: The workspace ID provided by get_workspace_tree() (e.g., 'ws-default' or 'ws-pipeline-1')
+
+        HINT: NEVER call this before get_workspace_tree.
         """
 
-        k = 50 if ENABLE_RERANKING else 3
+        try:
+            if not context or not context.get("build_details"):
+                return "Error: Missing context, tell the user to try to upload the context and try again."
 
-        documents = await hybrid_retriever(query=query, k=k)
+            job_name = context["job_details"]["full_name"]
+            build_number = context["build_details"]["number"]
 
-        # Rerank results
-        ordered_documents = documents
-        if ENABLE_RERANKING:
-            try:
-                ordered_documents: list[Document] = [
-                    data["document"]
-                    for data in get_reranked_documents(user_query, documents)
-                ]
-            except Exception as e:
-                print(e)
-                ordered_documents = documents
+            response = await call_jenkins_api(
+                endpoint="/chatbot-api/workspaceFile",
+                params={
+                    "jobName": job_name,
+                    "buildNumber": build_number,
+                    "workspaceId": workspace_id,
+                    "filePath": file_path,
+                },
+            )
 
-        output = "These documents might be useful to answer user question:\n"
-        cb_useful = None
-
-        for i, v in enumerate(ordered_documents[:3]):
-            # Apply extended retrieval
-            related_id = v.metadata.get("related_id")
-            if related_id:
-                # If is a codeblock, check which is the related chunk and pass as if that
-                # one was fetched from the hybrid retriever
-                print("RELATED: ", related_id)
-                payload_filter = models.Filter(
-                    must=[models.HasIdCondition(has_id=[related_id])]
+            if response.get("status") == "success":
+                return response.get("content", "")
+            else:
+                error_msg = response.get("message", "Unknown API Error")
+                return (
+                    f"Error reading file: {error_msg}. "
+                    "SYSTEM DIRECTIVE: You probably guessed an invalid 'workspace_id' or 'file_path'. "
+                    "You are FORBIDDEN from guessing. YOU MUST CALL 'get_workspace_tree' NOW to find the exact IDs and paths."
                 )
 
-                records, _ = get_with_metadata(payload_filter=payload_filter, limit=1)
-                docs = qdrant_record_to_langchain_doc(records)
-                if len(docs) == 0:
-                    continue
-                else:
-                    cb_useful = (v.metadata["parent_id"], v.metadata["chunk_index"])
-                    v = docs[0]
+        except Exception as e:
+            print(f"Failed to read file {file_path}: {e}")
+            return f"Error reading file: {str(e)}"
 
-            data_source = v.metadata.get("data_source")
-            retrieval_type = (
-                "parent"
-                if data_source == "discourse_topics" or data_source == "reddit_threads"
-                else "window"
-            )
-            final_text, _ = await retrieve_chunk_context(
-                v, retrieval_type, useful_cb=cb_useful
-            )
-
-            output += f"DOCUMENT {i}:\n{final_text}\n"
-
-        return output
-
-    user_query = "Show me a common Jenkins error log"
-    query = "error log"
-
-    async def run():
-        result = await fetch_from_vectordb(user_query=user_query, query=query)
-        print(result)
-
-    asyncio.run(run())
+    return [
+        fetch_from_vectordb,
+        get_general_jenkins_context,
+        get_installed_plugin_list,
+        get_job_details,
+        get_build_details,
+        get_workspace_tree,
+        get_workspace_file,
+    ]
