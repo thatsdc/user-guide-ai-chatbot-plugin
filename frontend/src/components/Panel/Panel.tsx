@@ -45,7 +45,7 @@ export default function Panel({
       variant="persistent"
       sx={{
         "& .MuiDrawer-paper": {
-          width: { xs: 320, sm: 384 },
+          width: { xs: 350, sm: 450 },
           borderLeft: 1,
           borderColor: "divider",
           bgcolor: "background.paper",
