@@ -1,30 +1,19 @@
 from langchain_core.messages import (
-    HumanMessage,
     SystemMessage,
-    BaseMessageChunk,
     ToolMessage,
     AIMessage,
 )
-from langgraph.types import StreamMode
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import StateGraph, START, END, MessagesState
 from langgraph.prebuilt import ToolNode
-from typing import Literal, AsyncIterator, Sequence, Optional, Dict, Any
-from .tools.tools import get_tool_list, fetch_context_from_db
-from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Literal
+from .tools.tools import get_tool_list
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from manage_env import get_env
 from pydantic import BaseModel, Field
-from langchain_core.messages import ToolCall
 from .prompts import ROUTER_SYSTEM_PROMPT, FINAL_LLM_SYSTEM_PROMPT
 from llm_client import get_llm_client
-import uuid
-from .utils import format_tools_for_prompt
-
-DEBUG_MODE = get_env("DEBUG_MODE").upper() == "TRUE"
-
-ENABLE_LANGFUSE = get_env("ENABLE_LANGFUSE").upper() == "TRUE"
-ENABLE_LANGSMITH = get_env("ENABLE_LANGSMITH").upper() == "TRUE"
+from langchain_core.tools import tool
 
 ROUTER_LLM_PROVIDER = get_env("ROUTER_LLM_PROVIDER")
 ROUTER_LLM_MODEL_NAME = get_env("ROUTER_LLM_MODEL_NAME")
@@ -39,31 +28,23 @@ FINAL_LLM_API_KEY = get_env("FINAL_LLM_API_KEY")
 FINAL_LLM_TEMPERATURE = float(get_env("FINAL_LLM_TEMPERATURE"))
 
 
-AvailableTools = Literal[
-    "fetch_from_vectordb",
-    "get_general_jenkins_context",
-    "get_installed_plugin_list",
-    "get_job_details",
-    "get_build_details",
-    "get_workspace_tree",
-    "get_workspace_file",
-]
+class RoutingArgs(BaseModel):
+    current_knowledge: str = Field(description="Summary of what you discovered so far.")
+    current_hypothesis: str = Field(
+        description="What you think is causing the problem."
+    )
 
 
-class RouterDecision(BaseModel):
-    thought: str = Field(description="Your internal reasoning about what to do next.")
-    action: Literal["TOOL_CALL", "READY", "OUT_OF_SCOPE"] = Field(
-        description="The action to take."
-    )
-    # Force the LLM to pick ONLY from the allowed list
-    tool_name: Optional[AvailableTools] = Field(
-        default=None,
-        description="If action is TOOL_CALL, the exact name of the tool to use. Otherwise, null.",
-    )
-    tool_arguments: Optional[Dict[str, Any]] = Field(
-        default=None,
-        description="If action is TOOL_CALL, a JSON object containing the arguments. Otherwise, null.",
-    )
+@tool(args_schema=RoutingArgs)
+def ready_to_answer(current_knowledge: str, current_hypothesis: str):
+    """Call this tool ONLY when you have gathered enough logs/code to answer the user's Jenkins question."""
+    pass
+
+
+@tool(args_schema=RoutingArgs)
+def declare_out_of_scope(current_knowledge: str, current_hypothesis: str):
+    """Call this tool ONLY when the user's query is completely unrelated to DevOps, Jenkins, or pipelines."""
+    pass
 
 
 class Agent:
@@ -77,7 +58,6 @@ class Agent:
             base_url=ROUTER_LLM_BASE_URL,
             temperature=ROUTER_LLM_TEMPERATURE,
         )
-        self.structured_router = router_llm.with_structured_output(RouterDecision)
 
         self.final_llm = get_llm_client(
             provider=FINAL_LLM_PROVIDER,
@@ -88,11 +68,14 @@ class Agent:
         )
 
         self.checkpointer = checkpointer
-        self.tools = get_tool_list(chat_id, context, prompt)
-        self.system_prompt = SystemMessage(
-            content=ROUTER_SYSTEM_PROMPT.format(format_tools_for_prompt(self.tools))
-        )
-        self.error_count = 0
+        self.tools = get_tool_list(chat_id, context, prompt) + [
+            ready_to_answer,
+            declare_out_of_scope,
+        ]
+        self.native_router = router_llm.bind_tools(self.tools)
+
+        self.system_prompt = SystemMessage(content=ROUTER_SYSTEM_PROMPT)
+        self.know_ws = False
 
     async def router_node(self, state: MessagesState) -> dict:
         """
@@ -101,109 +84,72 @@ class Agent:
         """
         messages = state["messages"]
 
+        # Check if the last tool call failed
         if messages:
             last_msg = messages[-1]
 
             if isinstance(last_msg, ToolMessage):
                 content_upper = str(last_msg.content).upper()
 
-                if (
-                    "ERROR" in content_upper
-                    or "NOT FOUND" in content_upper
-                    or "MISSING" in content_upper
-                ):
-                    self.error_count += 1
-
-                    if self.error_count > 1:
-                        print(
-                            f"\n[CIRCUIT BREAKER] Tool failed ({last_msg.name}). Bypassing Router LLM to prevent loops."
-                        )
-
-                        fake_thought = "MISSING_CONTEXT: The tool returned an error or the context is missing. I must stop trying and alert the final agent."
-
-                        ai_msg = AIMessage(
-                            content=f"<thought>\n{fake_thought}\n</thought>\n[READY]"
-                        )
-                        return {"messages": [ai_msg]}
+                if "[MISSING_CONTEXT]" in content_upper:
+                    print(
+                        f"\nCIRCUIT BREAKER -> Tool failed ({last_msg.name}). Bypassing Router LLM to prevent loops."
+                    )
+                    ai_msg = AIMessage(
+                        content="[MISSING_CONTEXT]: The tool returned an error or the context is missing. I must stop trying and alert the final agent."
+                    )
+                    return {"messages": [ai_msg]}
 
         router_input = [self.system_prompt] + messages
 
-        decision: RouterDecision = await self.structured_router.ainvoke(router_input)  # type: ignore
+        response = await self.native_router.ainvoke(router_input)
+
+        if not response.tool_calls:
+            fake_thought = f"Model bypassed tools and generated raw text"
+
+            ai_msg = AIMessage(content=f"[READY]: {fake_thought}")
+            return {"messages": [ai_msg]}
+
+        tool_call = response.tool_calls[0]
+        tool_name = tool_call["name"]
+        tool_args = tool_call["args"]
+
         result: dict = {}
 
-        if decision.action == "TOOL_CALL" and decision.tool_name:
-            tool_call = ToolCall(
-                name=decision.tool_name,
-                args=decision.tool_arguments or {},
-                id=f"call_{uuid.uuid4().hex[:8]}",
-            )
+        if tool_name == "ready_to_answer":
+            knowledge = tool_args.get("current_knowledge", "")
+            hypothesis = tool_args.get("current_hypothesis", "")
 
-            ai_msg = AIMessage(
-                content=f"<thought>\n{decision.thought}\n</thought>",
-                tool_calls=[tool_call],
-            )
+            combined_thought = f"Knowledge: {knowledge}\nHypothesis: {hypothesis}"
+            ai_msg = AIMessage(content=f"[READY]: {combined_thought}")
             result = {"messages": [ai_msg]}
 
-        elif decision.action == "READY":
-            ai_msg = AIMessage(
-                content=f"<thought>\n{decision.thought}\n</thought>\n[READY]"
-            )
+        elif tool_name == "declare_out_of_scope":
+            knowledge = tool_args.get("current_knowledge", "")
+            hypothesis = tool_args.get("current_hypothesis", "")
+
+            combined_thought = f"Knowledge: {knowledge}\nHypothesis: {hypothesis}"
+            ai_msg = AIMessage(content=f"[OUT_OF_SCOPE]: {combined_thought}")
             result = {"messages": [ai_msg]}
 
         else:
+            if tool_name == "get_workspace_file" and not self.know_ws:
+                print("REDIRECTING TO: get_workspace_tree")
+                tool_call["name"] = "get_workspace_tree"
+                tool_name = "get_workspace_tree"
+
+            if tool_name == "get_workspace_tree":
+                self.know_ws = True
+
             ai_msg = AIMessage(
-                content=f"<thought>\n{decision.thought}\n</thought>\n[OUT OF SCOPE]"
+                content=f"\nExecuting Jenkins Tool: {tool_name}",
+                tool_calls=[tool_call],
             )
             result = {"messages": [ai_msg]}
 
         return result
 
-    async def generate_final_response_node(
-        self, state: MessagesState, config: RunnableConfig
-    ) -> dict:
-        """
-        The Final LLM takes the conversation history and generates the final response.
-        We intercept the Router's last message, extract its decision, remove it from
-        the message history, and inject the instruction dynamically into the System Prompt.
-        """
-        messages = state["messages"]
-        last_message = messages[-1]
-        last_content = str(last_message.content).upper()
-
-        filtered_messages = messages[:-1]
-
-        dynamic_instruction = ""
-
-        if "MISSING_CONTEXT" in last_content:
-            dynamic_instruction = (
-                "\n\nCRITICAL DIRECTIVE FROM ROUTER: "
-                "The required logs or context are missing. "
-                "You MUST answer EXACTLY with: 'I don't have context information about this, please upload the context and try again.'"
-                "Do NOT attempt to guess the solution."
-            )
-        elif "[OUT OF SCOPE]" in last_content:
-            dynamic_instruction = (
-                "\n\nCRITICAL DIRECTIVE FROM ROUTER: "
-                "The user query is strictly OUT OF SCOPE. "
-                "You MUST politely decline to answer in a single sentence. "
-                "Answer with: 'I cannot assist you with this question.'"
-            )
-        elif "[READY]" in last_content:
-            dynamic_instruction = (
-                "\n\nCRITICAL DIRECTIVE FROM ROUTER: "
-                "The router found useful information to answer the user's question."
-                "You have to use the data to provide the user with a helpful answer."
-            )
-
-        final_system_prompt_content = FINAL_LLM_SYSTEM_PROMPT + dynamic_instruction
-        system_prompt = SystemMessage(content=final_system_prompt_content)
-        generation_input = [system_prompt] + filtered_messages
-
-        final_response = await self.final_llm.ainvoke(generation_input, config=config)
-
-        return {"messages": [final_response]}
-
-    async def handle_tool_error_node(self, state: MessagesState) -> dict:
+    def handle_tool_error_node(self, state: MessagesState) -> dict:
         """
         Catch malformed tool calls (e.g., bad JSON syntax) and return a message
         instructing the LLM to fix the syntax and try again.
@@ -241,20 +187,6 @@ class Agent:
         messages = state["messages"]
         last_message = messages[-1]
 
-        error_count = 0
-        for msg in reversed(messages[-5:]):
-            if msg.__class__.__name__ == "ToolMessage" and "System Error" in str(
-                msg.content
-            ):
-                error_count += 1
-
-        # If the LLM failed to call tools correctly 2 times in a row, give up and proceed
-        if error_count >= 2:
-            print(
-                "[SAFEGUARD ACTIVATED]: Too many tool errors. Forcing final response."
-            )
-            return "generate_final_response"
-
         if isinstance(last_message, AIMessage) and last_message.invalid_tool_calls:
             return "handle_tool_error"
 
@@ -264,15 +196,63 @@ class Agent:
         if isinstance(last_message.content, str):
             content_upper = last_message.content.upper()
 
-            if "[READY]" in content_upper or "[OUT OF SCOPE]" in content_upper:
+            if (
+                "[READY]" in content_upper
+                or "[MISSING_CONTEXT]" in content_upper
+                or "[OUT_OF_SCOPE]" in content_upper
+            ):
                 return "generate_final_response"
 
         return "generate_final_response"
 
+    async def generate_final_response_node(
+        self, state: MessagesState, config: RunnableConfig
+    ) -> dict:
+        """
+        The Final LLM takes the conversation history and generates the final response.
+        We intercept the Router's last message, extract its decision, remove it from
+        the message history, and inject the instruction dynamically into the System Prompt.
+        """
+        messages = state["messages"]
+        last_message = messages[-1]
+        last_content = str(last_message.content).upper()
+
+        filtered_messages = messages[:-1]
+
+        dynamic_instruction = ""
+
+        if "[MISSING_CONTEXT]" in last_content:
+            dynamic_instruction = (
+                "\n\nCRITICAL DIRECTIVE FROM ROUTER: "
+                "The required logs or context are missing. "
+                "You MUST answer EXACTLY with: 'I don't have context information about this, please upload the context and try again.'"
+                "Do NOT attempt to guess the solution."
+            )
+        elif "[OUT_OF_SCOPE]" in last_content:
+            dynamic_instruction = (
+                "\n\nCRITICAL DIRECTIVE FROM ROUTER: "
+                "The user query is strictly OUT OF SCOPE. "
+                "You MUST politely decline to answer in a single sentence. "
+                "Answer with: 'I cannot assist you with this question.'"
+            )
+        elif "[READY]" in last_content:
+            dynamic_instruction = (
+                "\n\nCRITICAL DIRECTIVE FROM ROUTER: "
+                "The router found useful information to answer the user's question."
+                "You have to use the data to provide the user with a helpful answer."
+            )
+
+        final_system_prompt_content = FINAL_LLM_SYSTEM_PROMPT + dynamic_instruction
+        system_prompt = SystemMessage(content=final_system_prompt_content)
+        generation_input = [system_prompt] + filtered_messages
+
+        final_response = await self.final_llm.ainvoke(generation_input, config=config)
+
+        return {"messages": [final_response]}
+
     def create_state_graph(
         self,
     ):
-
         workflow = StateGraph(MessagesState)
 
         workflow.add_node("router", self.router_node)
@@ -281,7 +261,6 @@ class Agent:
         workflow.add_node("handle_tool_error", self.handle_tool_error_node)
 
         workflow.add_edge(START, "router")
-
         workflow.add_conditional_edges(
             "router",
             self.router_condition,
@@ -291,218 +270,8 @@ class Agent:
                 "generate_final_response": "generate_final_response",
             },
         )
-
         workflow.add_edge("tools", "router")
-
         workflow.add_edge("handle_tool_error", "router")
-
         workflow.add_edge("generate_final_response", END)
 
         return workflow.compile(checkpointer=self.checkpointer)
-
-
-async def execute_agent_prod(
-    prompt: str,
-    chat_id: int,
-    db_session: AsyncSession,
-    checkpointer: AsyncPostgresSaver,
-):
-    """
-    Executes the agent and yields the final response chunk by chunk.
-    Streams both "messages" (for frontend tokens) and "updates" (for state debugging).
-    """
-    context = await fetch_context_from_db(chat_id, db_session)
-    app = Agent(chat_id, prompt, context, checkpointer).create_state_graph()
-
-    callbacks: list = []
-    metadata = {}
-    langfuse_handler = None
-    if ENABLE_LANGFUSE:
-        from langfuse.langchain import CallbackHandler
-
-        langfuse_handler = CallbackHandler()
-        callbacks.append(langfuse_handler)
-        metadata.update(
-            {"langfuse_session_id": str(chat_id), "langfuse_tags": ["prod"]}
-        )
-
-    if ENABLE_LANGSMITH:
-        metadata.update(
-            {
-                "environment": "prod",
-            }
-        )
-
-    execution_config: RunnableConfig = {
-        "configurable": {"thread_id": str(chat_id)},
-        "recursion_limit": 10,
-        "callbacks": callbacks,
-        "metadata": metadata,
-    }
-
-    input_message: MessagesState = {"messages": [HumanMessage(content=prompt)]}
-
-    try:
-        async for stream_mode, payload in app.astream(
-            input_message, config=execution_config, stream_mode=["messages"]
-        ):
-            if stream_mode == "messages":
-                msg, metadata = payload
-
-                if isinstance(metadata, dict):
-                    current_node = metadata.get("langgraph_node")
-
-                    if current_node == "generate_final_response":
-                        if isinstance(msg, BaseMessageChunk) and isinstance(
-                            msg.content, str
-                        ):
-                            if msg.content:
-                                yield msg.content
-
-    except Exception as e:
-        yield "\n\n**System Error:** The AI encountered an unexpected issue. Please try again."
-
-
-async def execute_agent_debug(
-    prompt: str,
-    chat_id: int,
-    db_session: AsyncSession,
-    checkpointer: AsyncPostgresSaver,
-):
-    """
-    Executes the agent and yields the final response chunk by chunk.
-    Streams both "messages" (for frontend tokens) and "updates" (for state debugging).
-    """
-    context = await fetch_context_from_db(chat_id, db_session)
-    app = Agent(chat_id, prompt, context, checkpointer).create_state_graph()
-
-    callbacks: list = []
-    metadata = {}
-    langfuse_handler = None
-    if ENABLE_LANGFUSE:
-        from langfuse.langchain import CallbackHandler
-
-        langfuse_handler = CallbackHandler()
-        callbacks.append(langfuse_handler)
-        metadata.update(
-            {"langfuse_session_id": str(chat_id), "langfuse_tags": ["debug"]}
-        )
-
-    if ENABLE_LANGSMITH:
-        metadata.update(
-            {
-                "environment": "debug",
-            }
-        )
-
-    execution_config: RunnableConfig = {
-        "configurable": {"thread_id": str(chat_id)},
-        "recursion_limit": 10,
-        "callbacks": callbacks,
-        "metadata": metadata,
-    }
-
-    print(execution_config)
-
-    input_message: MessagesState = {"messages": [HumanMessage(content=prompt)]}
-
-    print("\n=== AGENT EXECUTION STARTED ===")
-    print(f"[USER PROMPT]: {prompt}")
-
-    current_print_context = None
-
-    stream_node: Sequence[StreamMode] = ["messages", "updates"]
-
-    try:
-        async for stream_mode, payload in app.astream(
-            input_message, config=execution_config, stream_mode=stream_node
-        ):
-
-            # --- MESSAGES (Real-time token streaming for UI & Thoughts) ---
-            if stream_mode == "messages":
-                msg, metadata = payload
-
-                if isinstance(metadata, dict):
-                    current_node = metadata.get("langgraph_node")
-
-                    if current_node == "router":
-                        if (
-                            hasattr(msg, "content")
-                            and isinstance(msg.content, str)
-                            and msg.content
-                        ):
-                            if current_print_context != "router_thought":
-                                print("\n[ROUTER THOUGHT]: ", end="", flush=True)
-                                current_print_context = "router_thought"
-                            print(msg.content, end="", flush=True)
-
-                        if hasattr(msg, "tool_call_chunks") and msg.tool_call_chunks:
-                            for chunk in msg.tool_call_chunks:
-                                if chunk.get("name"):
-                                    print(
-                                        f"\n\n[ROUTER ACTION]: Preparing to call tool -> {chunk['name']}"
-                                    )
-                                    current_print_context = "router_action"
-
-                    elif current_node == "generate_final_response":
-                        if isinstance(msg, BaseMessageChunk) and isinstance(
-                            msg.content, str
-                        ):
-                            if msg.content:
-                                yield msg.content
-
-            # --- UPDATES (State transitions between nodes for Debugging) ---
-            elif stream_mode == "updates":
-                # payload is a dictionary representing what the node just returned
-                # Example: {"router": {"messages": [AIMessage(...)]}}
-
-                for node_name, state_update in payload.items():
-                    print(f"\n\n[STATE TRANSITION] >>> Node '{node_name}' finished.")
-
-                    messages_added = state_update.get("messages", [])
-
-                    # Ensure it's a list so we can iterate over it safely
-                    if not isinstance(messages_added, list):
-                        messages_added = [messages_added]
-
-                    for m in messages_added:
-                        msg_type = m.__class__.__name__
-
-                        # Truncate content to keep the console clean
-                        content_preview = str(m.content)[:150].replace("\n", " ")
-                        if len(str(m.content)) > 150:
-                            content_preview += "..."
-
-                        print(f"  -> Added {msg_type}: {content_preview}")
-
-                        # If the message contains tool calls, print them explicitly
-                        if hasattr(m, "tool_calls") and m.tool_calls:
-                            tools_requested = [tc["name"] for tc in m.tool_calls]
-                            print(f"  -> Tools Requested: {tools_requested}")
-
-                    print("-" * 60)
-                    current_print_context = "state_transition"
-
-    except Exception as e:
-        print(f"\n[CRITICAL ERROR] Execution interrupted: {str(e)}")
-        yield "\n\n**System Error:** The AI encountered an unexpected issue. Please try again."
-
-    finally:
-        print("\n=== AGENT EXECUTION FINISHED ===\n")
-
-
-async def execute_agent(
-    prompt: str,
-    chat_id: int,
-    db_session: AsyncSession,
-    checkpointer: AsyncPostgresSaver,
-) -> AsyncIterator[str]:
-
-    generator: AsyncIterator[str]
-    if DEBUG_MODE:
-        generator = execute_agent_debug(prompt, chat_id, db_session, checkpointer)
-    else:
-        generator = execute_agent_prod(prompt, chat_id, db_session, checkpointer)
-
-    async for chunk in generator:
-        yield chunk

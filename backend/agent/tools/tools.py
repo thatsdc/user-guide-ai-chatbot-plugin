@@ -20,7 +20,6 @@ from ..utils import (
 import re
 from manage_env import get_env
 from routers.auth import create_access_token
-import asyncio
 
 ENABLE_RERANKING = get_env("ENABLE_RERANKING").lower() == "true"
 CODE_BLOCK_PLACEHOLDER_PATTERN = r"\[\[CODE_BLOCK_(\d+)\]\]"
@@ -394,7 +393,7 @@ def get_tool_list(chat_id: int, context: dict, user_query: str) -> list[BaseTool
         system messages, and the current screen the user is viewing.
         """
         if not context:
-            return "Error: Missing context, tell the user to try to upload the context and try again."
+            return "[MISSING_CONTEXT]: tell the user to try to upload the context and try again."
 
         general_info = {
             "current_screen": context.get("current_screen", "Unknown"),
@@ -415,7 +414,7 @@ def get_tool_list(chat_id: int, context: dict, user_query: str) -> list[BaseTool
         """
 
         if not context.get("active_plugins"):
-            return "Error: Missing context, tell the user to try to upload the context and try again."
+            return "[MISSING_CONTEXT]: tell the user to try to upload the context and try again."
 
         return json.dumps(context["active_plugins"], indent=2)
 
@@ -427,7 +426,7 @@ def get_tool_list(chat_id: int, context: dict, user_query: str) -> list[BaseTool
         Do NOT use this tool to find execution logs (use get_build_details instead).
         """
         if not context.get("job_details"):
-            return "Error: Missing context, tell the user to try to upload the context and try again."
+            return "[MISSING_CONTEXT]: tell the user to try to upload the context and try again."
 
         return json.dumps(context["job_details"], indent=2)
 
@@ -440,13 +439,13 @@ def get_tool_list(chat_id: int, context: dict, user_query: str) -> list[BaseTool
 
         Args:
             log_search_query: A specific keyword or error type to search within the build logs
-                                (e.g., "Exception", "NullPointer", "npm ERR!", "timeout").
+                                (e.g., "Error", "Exception", "NullPointer", "npm ERR!", "timeout").
                                 If you need to search for errors you can pass "error".
 
         HINT: e.g., {"log_search_query": "error"}. STRICTLY DO NOT USE `build_id`
         """
         if not context.get("build_details"):
-            return "Error: Missing context, tell the user to try to upload the context and try again."
+            return "[MISSING_CONTEXT]: tell the user to try to upload the context and try again."
 
         logs = await get_build_logs(chat_id, log_search_query)
 
@@ -463,7 +462,7 @@ def get_tool_list(chat_id: int, context: dict, user_query: str) -> list[BaseTool
         """
         try:
             if not context or not context.get("build_details"):
-                return "Error: Missing context, tell the user to try to upload the context and try again."
+                return "[MISSING_CONTEXT]: tell the user to try to upload the context and try again."
 
             job_name = context["job_details"]["full_name"]
             build_number = context["build_details"]["number"]
@@ -487,7 +486,6 @@ def get_tool_list(chat_id: int, context: dict, user_query: str) -> list[BaseTool
     async def get_workspace_file(file_path: str, workspace_id: str) -> str:
         """
         Reads the content of a specific file within a Jenkins workspace.
-        Do NOT call this tool until you have called get_workspace_tree().
         You MUST call get_workspace_tree() tool first to obtain the correct 'workspace_id' and exact 'file_path'.
 
         Args:
@@ -499,7 +497,7 @@ def get_tool_list(chat_id: int, context: dict, user_query: str) -> list[BaseTool
 
         try:
             if not context or not context.get("build_details"):
-                return "Error: Missing context, tell the user to try to upload the context and try again."
+                return "[MISSING_CONTEXT]: tell the user to try to upload the context and try again."
 
             job_name = context["job_details"]["full_name"]
             build_number = context["build_details"]["number"]
