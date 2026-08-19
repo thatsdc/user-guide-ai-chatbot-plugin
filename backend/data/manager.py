@@ -148,7 +148,7 @@ async def start_manager():
     selected_sources = collector_menu()
 
     import asyncio
-    
+
     asyncio.run(start_data_pipeline(selected_sources, SCRIPT_DIR))
 
 
