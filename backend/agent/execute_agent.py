@@ -13,8 +13,8 @@ from .agent import Agent
 from manage_env import get_env
 
 DEBUG_MODE = get_env("DEBUG_MODE").lower() == "true"
-ENABLE_LANGFUSE = get_env("ENABLE_LANGFUSE").lower() == "true"
-ENABLE_LANGSMITH = get_env("ENABLE_LANGSMITH").lower() == "true"
+LANGFUSE_TRACING = get_env("LANGFUSE_TRACING").lower() == "true"
+LANGSMITH_TRACING = get_env("LANGSMITH_TRACING").lower() == "true"
 LANGGRAPH_RECURSION_LIMIT = int(get_env("LANGGRAPH_RECURSION_LIMIT") or 10)
 
 
@@ -34,7 +34,7 @@ async def execute_agent_prod(
     callbacks: list = []
     metadata = {}
     langfuse_handler = None
-    if ENABLE_LANGFUSE:
+    if LANGFUSE_TRACING:
         from langfuse.langchain import CallbackHandler
 
         langfuse_handler = CallbackHandler()
@@ -43,7 +43,7 @@ async def execute_agent_prod(
             {"langfuse_session_id": str(chat_id), "langfuse_tags": ["prod"]}
         )
 
-    if ENABLE_LANGSMITH:
+    if LANGSMITH_TRACING:
         metadata.update(
             {
                 "environment": "prod",
@@ -96,7 +96,7 @@ async def execute_agent_debug(
     callbacks: list = []
     metadata = {}
     langfuse_handler = None
-    if ENABLE_LANGFUSE:
+    if LANGFUSE_TRACING:
         from langfuse.langchain import CallbackHandler
 
         langfuse_handler = CallbackHandler()
@@ -105,7 +105,7 @@ async def execute_agent_debug(
             {"langfuse_session_id": str(chat_id), "langfuse_tags": ["debug"]}
         )
 
-    if ENABLE_LANGSMITH:
+    if LANGSMITH_TRACING:
         metadata.update(
             {
                 "environment": "debug",
