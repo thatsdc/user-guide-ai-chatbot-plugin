@@ -70,8 +70,8 @@ JUDGE_MODEL = CustomLangChainJudge(
     base_url=JUDGE_LLM_BASE_URL,
 )
 
-ENABLE_LANGFUSE = get_env("ENABLE_LANGFUSE").upper() == "TRUE"
-ENABLE_LANGSMITH = get_env("ENABLE_LANGSMITH").upper() == "TRUE"
+LANGFUSE_TRACING = get_env("LANGFUSE_TRACING").upper() == "TRUE"
+LANGSMITH_TRACING = get_env("LANGSMITH_TRACING").upper() == "TRUE"
 
 
 async def execute_test_agent(prompt: str, chat_id: int = 999) -> tuple[str, list[str]]:
@@ -93,7 +93,7 @@ async def execute_test_agent(prompt: str, chat_id: int = 999) -> tuple[str, list
     callbacks: list = []
     metadata = {}
     langfuse_handler = None
-    if ENABLE_LANGFUSE:
+    if LANGFUSE_TRACING:
         from langfuse.langchain import CallbackHandler
 
         langfuse_handler = CallbackHandler()
@@ -102,7 +102,7 @@ async def execute_test_agent(prompt: str, chat_id: int = 999) -> tuple[str, list
             {"langfuse_session_id": str(chat_id), "langfuse_tags": ["eval"]}
         )
 
-    if ENABLE_LANGSMITH:
+    if LANGSMITH_TRACING:
         metadata.update(
             {
                 "environment": "eval",
