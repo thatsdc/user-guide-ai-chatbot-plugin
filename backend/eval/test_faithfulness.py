@@ -10,7 +10,7 @@ from eval_tracker import tracker
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("test_case", FAITHFULNESS_TEST_CASES)
-@patch("agent.tools.tools.get_tool_list")
+@patch("agent.agent.get_tool_list")
 async def test_faithfulness(mock_get_tool_list, test_case: dict):
     """
     Evaluates Faithfulness (Groundedness) across multiple scenarios.
@@ -43,5 +43,5 @@ async def test_faithfulness(mock_get_tool_list, test_case: dict):
     try:
         assert_test(test_case_obj, [faithfulness_metric])
     finally:
-        if faithfulness_metric.score:
+        if faithfulness_metric.score is not None:
             tracker.add_score("faithfulness", faithfulness_metric.score)

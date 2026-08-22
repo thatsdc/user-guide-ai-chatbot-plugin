@@ -8,6 +8,7 @@ from agent.agent import Agent
 from deepeval.models.base_model import DeepEvalBaseLLM
 from langchain_core.language_models.chat_models import BaseChatModel
 from llm_client import get_llm_client
+import pytest
 
 
 class CustomLangChainJudge(DeepEvalBaseLLM):
@@ -62,6 +63,12 @@ JUDGE_MODEL = CustomLangChainJudge(
     api_key=JUDGE_LLM_API_KEY,
     base_url=JUDGE_LLM_BASE_URL,
 )
+
+if not JUDGE_LLM_PROVIDER or not JUDGE_LLM_MODEL_NAME:
+    pytest.skip(
+        "JUDGE_LLM_PROVIDER and JUDGE_LLM_MODEL_NAME must be set to run eval tests.",
+        allow_module_level=True,
+    )
 
 
 async def execute_test_agent(prompt: str, chat_id: int = 999) -> tuple[str, list[str]]:

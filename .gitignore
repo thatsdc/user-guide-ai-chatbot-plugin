@@ -11,6 +11,7 @@ docs/doctrees
 
 # backend folder
 .env
+.env.prod
 venv
 .venv
 __pycache__
@@ -42,7 +43,4 @@ work
 .project
 
 # VScode
-.vscode
-
-# deepeval
-.deepeval
+.vscode/

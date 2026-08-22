@@ -27,7 +27,7 @@ jobs:
       - name: Install dependencies with uv
         working-directory: backend
         run: |
-          uv sync
+          uv sync --extra dev
 
       - name: Run e2e tests
         working-directory: backend

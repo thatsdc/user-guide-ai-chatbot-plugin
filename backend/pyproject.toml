@@ -41,21 +41,17 @@ dependencies = [
     "sphinx",
     "sqlalchemy",
     "urllib3",
-    "uv>=0.12.2",
     "uvicorn",
     "openai>=2.45.0",
     "sentence-transformers>=5.7.0",
     "fastembed>=0.8.0",
 ]
 
-[project.scripts]
-backend = "backend:main"
-
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-[dependency-groups]
+[project.optional-dependencies]
 dev = [
     "black==26.5.1",
     "pytest==9.0.3",
@@ -63,4 +59,4 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["backend"]
+packages = ["."]

@@ -1,6 +1,6 @@
 from vectordb.qdrant import get_vector_store
 from langchain_core.documents import Document
-from qdrant_client.http.models import models
+from qdrant_client import models
 import asyncio
 
 

@@ -12,8 +12,8 @@ from langgraph.checkpoint.memory import MemorySaver
 from manage_env import get_env
 from eval_tracker import tracker
 
-PRICE_PER_1M_INPUT_TOKENS = float(get_env("PRICE_PER_1M_INPUT_TOKENS"))
-PRICE_PER_1M_OUTPUT_TOKENS = float(get_env("PRICE_PER_1M_OUTPUT_TOKENS"))
+PRICE_PER_1M_INPUT_TOKENS = float(get_env("PRICE_PER_1M_INPUT_TOKENS") or 0)
+PRICE_PER_1M_OUTPUT_TOKENS = float(get_env("PRICE_PER_1M_OUTPUT_TOKENS") or 0)
 
 
 class AgentLatencyMetric(BaseMetric):

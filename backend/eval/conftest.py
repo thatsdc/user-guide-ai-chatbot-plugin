@@ -12,7 +12,6 @@ def pytest_sessionfinish(session, exitstatus):
     report = {}
 
     for metric_name, scores in tracker.scores.items():
-        print(scores)
         if scores:
             average = sum(scores) / len(scores)
             report[f"average_{metric_name}"] = round(average, 5)

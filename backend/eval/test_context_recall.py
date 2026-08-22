@@ -59,5 +59,5 @@ async def test_real_vectordb_context_recall(test_case: dict):
         print(f"\n[Recall Failed] Reason: {context_recall_metric.reason}")
         raise e
     finally:
-        if context_recall_metric.score:
+        if context_recall_metric.score is not None:
             tracker.add_score("context_recall", context_recall_metric.score)
