@@ -2,9 +2,9 @@ import pytest
 from unittest.mock import patch
 from deepeval.metrics import AnswerRelevancyMetric
 from deepeval import assert_test
-from test_cases import ANSWER_RELEVANCY_TEST_CASES
-from utils import execute_test_agent, create_mock_tools, JUDGE_MODEL
-from eval_tracker import tracker
+from eval.test_cases import ANSWER_RELEVANCY_TEST_CASES
+from eval.utils import execute_test_agent, create_mock_tools, JUDGE_MODEL
+from eval.eval_tracker import tracker
 from deepeval.test_case import LLMTestCase
 
 

@@ -57,18 +57,18 @@ JUDGE_LLM_MODEL_NAME = get_env("JUDGE_LLM_MODEL_NAME")
 JUDGE_LLM_BASE_URL = get_env("JUDGE_LLM_BASE_URL")
 JUDGE_LLM_API_KEY = get_env("JUDGE_LLM_API_KEY")
 
+if not JUDGE_LLM_PROVIDER or not JUDGE_LLM_MODEL_NAME:
+    pytest.skip(
+        "JUDGE_LLM_PROVIDER and JUDGE_LLM_MODEL_NAME must be set to run eval tests.",
+        allow_module_level=True,
+    )
+
 JUDGE_MODEL = CustomLangChainJudge(
     provider=JUDGE_LLM_PROVIDER,
     model_name=JUDGE_LLM_MODEL_NAME,
     api_key=JUDGE_LLM_API_KEY,
     base_url=JUDGE_LLM_BASE_URL,
 )
-
-if not JUDGE_LLM_PROVIDER or not JUDGE_LLM_MODEL_NAME:
-    pytest.skip(
-        "JUDGE_LLM_PROVIDER and JUDGE_LLM_MODEL_NAME must be set to run eval tests.",
-        allow_module_level=True,
-    )
 
 
 async def execute_test_agent(prompt: str, chat_id: int = 999) -> tuple[str, list[str]]:

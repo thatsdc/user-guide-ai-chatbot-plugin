@@ -3,9 +3,9 @@ from unittest.mock import patch
 from deepeval.test_case import LLMTestCase
 from deepeval.metrics import FaithfulnessMetric
 from deepeval import assert_test
-from utils import execute_test_agent, create_mock_tools, JUDGE_MODEL
-from test_cases import FAITHFULNESS_TEST_CASES
-from eval_tracker import tracker
+from eval.utils import execute_test_agent, create_mock_tools, JUDGE_MODEL
+from eval.test_cases import FAITHFULNESS_TEST_CASES
+from eval.eval_tracker import tracker
 
 
 @pytest.mark.asyncio

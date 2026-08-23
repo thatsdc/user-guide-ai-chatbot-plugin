@@ -6,11 +6,11 @@ from deepeval.test_case import LLMTestCase
 from deepeval.metrics import BaseMetric
 from deepeval import assert_test
 
-from test_cases import PERFORMANCE_TEST_CASES
+from eval.test_cases import PERFORMANCE_TEST_CASES
 from agent.agent import Agent
 from langgraph.checkpoint.memory import MemorySaver
 from manage_env import get_env
-from eval_tracker import tracker
+from eval.eval_tracker import tracker
 
 PRICE_PER_1M_INPUT_TOKENS = float(get_env("PRICE_PER_1M_INPUT_TOKENS") or 0)
 PRICE_PER_1M_OUTPUT_TOKENS = float(get_env("PRICE_PER_1M_OUTPUT_TOKENS") or 0)

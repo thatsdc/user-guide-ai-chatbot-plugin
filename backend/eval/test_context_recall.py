@@ -3,9 +3,9 @@ from deepeval.test_case import LLMTestCase
 from deepeval.metrics import ContextualRecallMetric
 from deepeval import assert_test
 from agent.tools.tools import get_tool_list
-from utils import JUDGE_MODEL
-from test_cases import CONTEXT_RECALL_TEST_CASES
-from eval_tracker import tracker
+from eval.utils import JUDGE_MODEL
+from eval.test_cases import CONTEXT_RECALL_TEST_CASES
+from eval.eval_tracker import tracker
 
 
 @pytest.mark.asyncio

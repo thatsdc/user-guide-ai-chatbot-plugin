@@ -9,7 +9,6 @@ from datetime import datetime
 from pathlib import Path
 from .tools.common import write_json_file, datetime_serializer
 from .models import DataSource, DataPhase
-import asyncio
 
 
 def clear_terminal() -> None:
