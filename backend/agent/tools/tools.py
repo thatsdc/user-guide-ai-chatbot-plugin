@@ -324,7 +324,6 @@ def get_tool_list(chat_id: int, context: dict, user_query: str) -> list[BaseTool
         Args:
             query: The search input (e.g., "How to write a declarative pipeline", "Docker plugin setup").
         """
-        print("INPUT: ", query)
         k = 50 if ENABLE_RERANKING else 3
 
         sources = ["jenkins_docs", "plugin_docs", "reddit_threads", "discourse_topics"]
@@ -349,7 +348,6 @@ def get_tool_list(chat_id: int, context: dict, user_query: str) -> list[BaseTool
                     for data in get_reranked_documents(user_query, documents)
                 ]
             except Exception as e:
-                print(e)
                 ordered_documents = documents
 
         output = "These documents might be useful to answer user question:\n"
@@ -385,7 +383,6 @@ def get_tool_list(chat_id: int, context: dict, user_query: str) -> list[BaseTool
 
             output += f"DOCUMENT {i}:\n{final_text}\n"
 
-        print("OUTPUT: ", output)
         return output
 
     @tool

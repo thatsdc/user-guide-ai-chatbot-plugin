@@ -1,6 +1,7 @@
 from vectordb.qdrant import get_vector_store
 from langchain_core.documents import Document
-from qdrant_client.http import models
+from qdrant_client import models
+import asyncio
 
 
 async def hybrid_retriever(
@@ -21,11 +22,12 @@ async def hybrid_retriever(
         return await get_vector_store().asimilarity_search(
             query=query, k=k, filter=payload_filter
         )
-    except Exception:
+    except Exception as e:
+        print("VectorDB Error: ", e)
         return []
 
 
 if __name__ == "__main__":
     query = "Jenkins EC2 memory"
-    results = hybrid_retriever(query)
+    results = asyncio.run(hybrid_retriever(query))
     print(results)

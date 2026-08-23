@@ -10,10 +10,12 @@ docs/html
 docs/doctrees
 
 # backend folder
-.env.prod
 .env
+.env.prod
+venv
 .venv
 __pycache__
+.pytest_cache
 output
 logs
 test_reports
@@ -39,3 +41,6 @@ work
 .settings
 .classpath
 .project
+
+# VScode
+.vscode/

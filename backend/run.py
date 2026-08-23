@@ -31,18 +31,8 @@ def install():
         [str(PYTHON), "-m", "pip", "install", "--upgrade", "pip"], check=True
     )
 
-    file_name = "requirements.txt"
-
-    if IS_WINDOWS:
-        file_name = "requirements-windows.txt"
-
-    req = SCRIPT_DIR / file_name
-
-    if req.exists():
-        print(f"--> Installing from dependencies from {file_name} file.")
-        subprocess.run(
-            [str(PYTHON), "-m", "pip", "install", "-r", str(req)], check=True
-        )
+    # Installing requirements
+    subprocess.run([str(PYTHON), "-m", "pip", "install", ".[dev]"], check=True)
 
     print("--> Installation complete.")
 
@@ -113,28 +103,10 @@ def format():
 def pre_commit():
     print("--> Running pre-commit checks...")
 
-    file_name = "requirements.txt"
-
-    if IS_WINDOWS:
-        file_name = "requirements-windows.txt"
-
-    print(f"    [1/3] Updating {file_name}...")
-
-    req = SCRIPT_DIR / file_name
-
-    result = subprocess.run(
-        [str(PYTHON), "-m", "pip", "freeze"],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    req.write_text(result.stdout, encoding="utf-8")
-    print(f"          Written to {req}")
-
-    print("    [2/3] Running tests...")
+    print("    [1/2] Running tests...")
     test()
 
-    print("    [3/3] Formatting code...")
+    print("    [2/2] Formatting code...")
     format()
 
     print("--> Pre-commit checks passed. Safe to commit.")
@@ -153,9 +125,7 @@ def show_help():
     )
     print("  python run.py test        - Run the test suite with pytest")
     print("  python run.py format      - Format code with black")
-    print(
-        "  python run.py pre-commit  - Update requirements.txt, run tests, and format"
-    )
+    print("  python run.py pre-commit  - Run tests and format")
     print(
         "  python run.py clean       - Remove virtual environment, caches, and temp files"
     )
