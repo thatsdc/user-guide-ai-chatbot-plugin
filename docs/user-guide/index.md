@@ -1,12 +1,11 @@
 # User Guide
 
-This section includes two different types of guides: 
-- Quick installation: this is for those who want to quickly set up the plugin to test it on their system. 
-- Manual installation: this is for those who want to explore all the possible features and configurations available to the plugin.
+The guide has a quick installation guide and also talks about the different possible options the plugin has and how to configure each one of these.
 
 ```{toctree}
 :maxdepth: 1
+:caption: Content:
 
-quick-installation/index
-manual-installation/index
+quick-installation
+configuration
 ```

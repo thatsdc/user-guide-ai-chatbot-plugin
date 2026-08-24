@@ -1,3 +1,0 @@
-# Quick Installation
-
-Quick
