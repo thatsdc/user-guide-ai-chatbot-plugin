@@ -1,6 +1,6 @@
 # User Guide
 
-The guide has a quick installation guide and also talks about the different possible options the plugin has and how to configure each one of these.
+The guide includes a quick installation procedure and explains the different options available for the plugin, explaining how to configure them.
 
 ```{toctree}
 :maxdepth: 1

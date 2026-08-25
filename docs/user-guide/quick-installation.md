@@ -1,6 +1,6 @@
 # Quick Installation
 
-This guide helps explain how to quickly setup the plugin to try it for the first time,skipping options and additional configurations.
+This guide helps explain how to quickly setup the plugin to try it for the first time, skipping additional configurations.
 
 ### 1. Prerequisites
 
@@ -94,7 +94,7 @@ python run.py prod
 
 ### 9. Restart Jenkins
 
-Now restart Jenkins, and you should be finally able to see the button to open chatbot panel at the bottom right of the screen.
+Now restart Jenkins and you should be finally able to see the button to open chatbot panel at the bottom right of the screen.
 
 ![Open panel button](../../_static/images/ai-chatbot-button.png)
 

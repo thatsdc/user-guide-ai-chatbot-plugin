@@ -2,11 +2,15 @@
 
 ## Hybrid retriever
 
-The hybrid retriever it used for retrieving docs, threads and build logs.
+The hybrid retriever is used for retrieving docs, discussions and build logs.
 
 Before to using, it's required to collect, vectorize and store the data in the vector db (qdrant). 
 
-There are 4 different types of sources: "jenkins_docs", "plugin_docs", "reddit_threads", "discourse_topics".
+There are 4 different types of sources: 
+- Official Jenkins Documentation (jenkins_docs)
+- Jenkins Plugin Documentations (plugin_docs)
+- "r/jenkinsci" Reddit Threads (reddit_threads)
+- Official Discourse Topics (discourse_topics)
 
 To start the process of population of the vector db you must run the following command listing the sources you are interested in. 
 
@@ -14,23 +18,28 @@ To start the process of population of the vector db you must run the following c
 python -m data.manager --sources jenkins_docs plugin_docs
 ```
 
-You can also pick the embedding model and sparse model that you prefer.
+You can also pick the embedding model and sparse model that you prefer the two default
+are the suggested ones.
 
 ```bash
 ####### HYBRID RETRIEVER #######
 # Search for one here: https://huggingface.co/models?library=sentence-transformers
 HUGGING_FACE_EMBEDDING_NAME="all-MiniLM-L6-v2"
+EMBEDDING_SIZE="384"
 
 # Search for one here: https://qdrant.github.io/fastembed/examples/Supported_Models/#supported-text-embedding-models
 FAST_EMBED_SPARSE_MODEL_NAME="Qdrant/bm25"
 
-EMBEDDING_SIZE="384"
 ```
 
 ## Contextual Retrieval 
 
 The contextual retrieval is a technique used to improve the retrieval accuracy by appending a 
 small context summary before each chunk stored in the vectordb.
+
+Read more:
+- https://www.datacamp.com/tutorial/contextual-retrieval-anthropic?dc_referrer=https%3A%2F%2Fwww.google.com%2F
+- https://platform.claude.com/cookbook/capabilities-contextual-embeddings-guide
 
 WARNING: This function can give some benefits, but it will surely increment setup costs and time.
 
@@ -67,7 +76,7 @@ LANGSMITH_PROJECT="AI Chatbot Jenkins"
 
 The Agent is powered by two different LLMs.
 
-The Router LLM picks the tools and decide the next move of the agent. 
+The Router LLM picks the tools and decide the next action. 
 The Final LLM reads the context and info retrieved and create the final response to the user.
 
 If you prefer you can set the same values for both.
@@ -122,6 +131,7 @@ QDRANT_SECRET_KEY="your-secret-key"
 ## Reranker
 
 The reranker model is used to rerank the results retrieved by the hybrid retriever.
+This highly improve results accuracy.
 
 ```bash
 ########### RERANKING ############
