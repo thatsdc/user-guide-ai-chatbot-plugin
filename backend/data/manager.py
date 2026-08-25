@@ -145,12 +145,13 @@ async def start_data_pipeline(selected_sources: list[DataSource], script_dir: Pa
 
 def list_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--sources", 
-                        type=lambda c: DataSource(c.lower()),
-                        nargs="+", 
-                        choices=list(DataSource),
-                        required=False
-                    )
+    parser.add_argument(
+        "--sources",
+        type=lambda c: DataSource(c.lower()),
+        nargs="+",
+        choices=list(DataSource),
+        required=False,
+    )
     return parser.parse_args().sources
 
 
@@ -162,6 +163,7 @@ def start_manager():
         selected_sources = collector_menu()
 
     import asyncio
+
     asyncio.run(start_data_pipeline(selected_sources, SCRIPT_DIR))
 
 
