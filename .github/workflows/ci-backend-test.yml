@@ -30,6 +30,7 @@ jobs:
           uv sync --extra dev
 
       - name: Run e2e tests
+        working-directory: backend
         run: |
           uv run pytest tests/e2e
       - name: Run unit tests
