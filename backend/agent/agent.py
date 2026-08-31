@@ -155,10 +155,9 @@ class Agent:
                 return {"messages": [ai_msg]}
 
             elif tool_name == "get_workspace_file" and not self.know_ws:
-                tool_call["name"] = "get_workspace_tree"
-                tool_name = "get_workspace_tree"
+                tool_call: ToolCall = {"name": "get_workspace_tree", "args": {}, "id": tool_call.get("id")}
 
-            if tool_name == "get_workspace_tree":
+            if tool_call["name"] == "get_workspace_tree":
                 self.know_ws = True
             selected_tools.append(tool_call)
 
