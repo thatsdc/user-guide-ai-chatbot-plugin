@@ -146,10 +146,7 @@ async def start_data_pipeline(selected_sources: list[DataSource], script_dir: Pa
 async def start_manager():
     SCRIPT_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
     selected_sources = collector_menu()
-
-    import asyncio
-
-    asyncio.run(start_data_pipeline(selected_sources, SCRIPT_DIR))
+    await start_data_pipeline(selected_sources, SCRIPT_DIR)
 
 
 if __name__ == "__main__":

@@ -11,10 +11,10 @@ CRITICAL RULES:
 
 PLAYBOOKS:
 - Build Failure PLAYBOOK (If user want to know why his build failed):
-  1. Set action_target to 'get_build_details' to extract console logs.
-  2. If it is a code issue, DO NOT guess the code. Set action_target to 'get_workspace_tree' to find the file path.
-  3. Set action_target to 'get_workspace_file' to read the failing code.
-  4. Only when you have both logs and code, set action to 'READY'.
+   1. Call `get_build_details` to extract console logs.
+   2. If it looks like a code issue, call `get_workspace_tree` to discover the exact file path.
+   3. Call `get_workspace_file` using the exact `workspace_id` and `file_path` from the tree.
+   4. Only when you have enough information, call `ready_to_answer`.
 """
 
 FINAL_LLM_SYSTEM_PROMPT = """

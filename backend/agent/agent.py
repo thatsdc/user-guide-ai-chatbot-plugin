@@ -2,7 +2,10 @@ from langchain_core.messages import (
     SystemMessage,
     ToolMessage,
     AIMessage,
+    ToolCall,
+    trim_messages,
 )
+import tiktoken
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import StateGraph, START, END, MessagesState
 from langgraph.prebuilt import ToolNode
@@ -20,12 +23,24 @@ ROUTER_LLM_MODEL_NAME = get_env("ROUTER_LLM_MODEL_NAME")
 ROUTER_LLM_BASE_URL = get_env("ROUTER_LLM_BASE_URL")
 ROUTER_LLM_API_KEY = get_env("ROUTER_LLM_API_KEY")
 ROUTER_LLM_TEMPERATURE = float(get_env("ROUTER_LLM_TEMPERATURE"))
+ROUTER_LLM_MAX_TOKENS = max(int(get_env("ROUTER_LLM_MAX_TOKENS")), 4000)
 
 FINAL_LLM_PROVIDER = get_env("FINAL_LLM_PROVIDER")
 FINAL_LLM_MODEL_NAME = get_env("FINAL_LLM_MODEL_NAME")
 FINAL_LLM_BASE_URL = get_env("FINAL_LLM_BASE_URL")
 FINAL_LLM_API_KEY = get_env("FINAL_LLM_API_KEY")
 FINAL_LLM_TEMPERATURE = float(get_env("FINAL_LLM_TEMPERATURE"))
+FINAL_LLM_MAX_TOKENS = max(int(get_env("FINAL_LLM_MAX_TOKENS")), 4000)
+
+
+local_encoder = tiktoken.get_encoding("cl100k_base")
+
+
+def count_tokens_locally(messages: list) -> int:
+    total_tokens = 0
+    for msg in messages:
+        total_tokens += len(local_encoder.encode(str(msg.content)))
+    return total_tokens
 
 
 class RoutingArgs(BaseModel):
@@ -100,54 +115,59 @@ class Agent:
                     )
                     return {"messages": [ai_msg]}
 
-        router_input = [self.system_prompt] + messages
+        trimmed_history = trim_messages(
+            messages,
+            max_tokens=ROUTER_LLM_MAX_TOKENS - 2000,
+            strategy="last",
+            token_counter=count_tokens_locally,
+            include_system=False,
+            allow_partial=False,
+        )
+        router_input = [self.system_prompt] + trimmed_history
 
         response = await self.native_router.ainvoke(router_input)
 
         if not response.tool_calls:
             fake_thought = f"Model bypassed tools and generated raw text"
-
             ai_msg = AIMessage(content=f"[READY]: {fake_thought}")
             return {"messages": [ai_msg]}
 
-        tool_call = response.tool_calls[0]
-        tool_name = tool_call["name"]
-        tool_args = tool_call["args"]
+        selected_tools: list[ToolCall] = []
 
-        result: dict = {}
+        for tool_call in response.tool_calls:
+            tool_name = tool_call["name"]
+            tool_args = tool_call["args"]
 
-        if tool_name == "ready_to_answer":
-            knowledge = tool_args.get("current_knowledge", "")
-            hypothesis = tool_args.get("current_hypothesis", "")
+            if tool_name == "ready_to_answer":
+                knowledge = tool_args.get("current_knowledge", "")
+                hypothesis = tool_args.get("current_hypothesis", "")
 
-            combined_thought = f"Knowledge: {knowledge}\nHypothesis: {hypothesis}"
-            ai_msg = AIMessage(content=f"[READY]: {combined_thought}")
-            result = {"messages": [ai_msg]}
+                combined_thought = f"Knowledge: {knowledge}\nHypothesis: {hypothesis}"
+                ai_msg = AIMessage(content=f"[READY]: {combined_thought}")
+                return {"messages": [ai_msg]}
 
-        elif tool_name == "declare_out_of_scope":
-            knowledge = tool_args.get("current_knowledge", "")
-            hypothesis = tool_args.get("current_hypothesis", "")
+            elif tool_name == "declare_out_of_scope":
+                knowledge = tool_args.get("current_knowledge", "")
+                hypothesis = tool_args.get("current_hypothesis", "")
 
-            combined_thought = f"Knowledge: {knowledge}\nHypothesis: {hypothesis}"
-            ai_msg = AIMessage(content=f"[OUT_OF_SCOPE]: {combined_thought}")
-            result = {"messages": [ai_msg]}
+                combined_thought = f"Knowledge: {knowledge}\nHypothesis: {hypothesis}"
+                ai_msg = AIMessage(content=f"[OUT_OF_SCOPE]: {combined_thought}")
+                return {"messages": [ai_msg]}
 
-        else:
-            if tool_name == "get_workspace_file" and not self.know_ws:
-                print("REDIRECTING TO: get_workspace_tree")
+            elif tool_name == "get_workspace_file" and not self.know_ws:
                 tool_call["name"] = "get_workspace_tree"
                 tool_name = "get_workspace_tree"
 
             if tool_name == "get_workspace_tree":
                 self.know_ws = True
+            selected_tools.append(tool_call)
 
-            ai_msg = AIMessage(
-                content=f"\nExecuting Jenkins Tool: {tool_name}",
-                tool_calls=[tool_call],
-            )
-            result = {"messages": [ai_msg]}
+        ai_msg = AIMessage(
+            content=f"\nExecuting following Jenkins Tools: {selected_tools}",
+            tool_calls=selected_tools,
+        )
 
-        return result
+        return {"messages": [ai_msg]}
 
     def handle_tool_error_node(self, state: MessagesState) -> dict:
         """
@@ -193,16 +213,6 @@ class Agent:
         if isinstance(last_message, AIMessage) and last_message.tool_calls:
             return "tools"
 
-        if isinstance(last_message.content, str):
-            content_upper = last_message.content.upper()
-
-            if (
-                "[READY]" in content_upper
-                or "[MISSING_CONTEXT]" in content_upper
-                or "[OUT_OF_SCOPE]" in content_upper
-            ):
-                return "generate_final_response"
-
         return "generate_final_response"
 
     async def generate_final_response_node(
@@ -217,7 +227,14 @@ class Agent:
         last_message = messages[-1]
         last_content = str(last_message.content).upper()
 
-        filtered_messages = messages[:-1]
+        trimmed_history = trim_messages(
+            messages[:-1],
+            max_tokens=FINAL_LLM_MAX_TOKENS - 2000,
+            strategy="last",
+            token_counter=count_tokens_locally,
+            include_system=False,
+            allow_partial=False,
+        )
 
         dynamic_instruction = ""
 
@@ -244,7 +261,7 @@ class Agent:
 
         final_system_prompt_content = FINAL_LLM_SYSTEM_PROMPT + dynamic_instruction
         system_prompt = SystemMessage(content=final_system_prompt_content)
-        generation_input = [system_prompt] + filtered_messages
+        generation_input = [system_prompt] + trimmed_history
 
         final_response = await self.final_llm.ainvoke(generation_input, config=config)
 

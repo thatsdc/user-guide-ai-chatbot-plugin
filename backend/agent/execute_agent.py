@@ -77,6 +77,7 @@ async def execute_agent_prod(
                                 yield msg.content
 
     except Exception as e:
+        print(f"\n[CRITICAL ERROR] Execution interrupted: {str(e)}")
         yield "**System Error:** The AI encountered an unexpected issue. Please try again."
 
 
