@@ -512,8 +512,6 @@ public class ChatbotApiAction implements RootAction {
                         // Generate the Jenkins context and parse it as a JSON object
                         JSONObject contextJson = getCurrentContext(request);
 
-                        System.out.println(contextJson);
-
                         // Inject the context into the main payload under a specific key
                         payload.put("jenkinsContext", contextJson);
 

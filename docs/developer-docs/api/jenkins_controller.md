@@ -4,7 +4,7 @@ Here are listed and documented all the Jenkins Controller endpoints.
 
 ## Starting the Controller
 ```bash
-mvm clean hpi:run
+mvn clean hpi:run
 ```
 
 ## Available Endpoints
@@ -12,7 +12,7 @@ mvm clean hpi:run
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/chatbot-api/*` | ANY | Proxy method which forwards req to the FastApi Backend |
-| `/chatbot-api/workspaceFile/` | GET | Get the various workspace trees |
+| `/chatbot-api/workspaceTree/` | GET | Get the various workspace trees |
 | `/chatbot-api/workspaceFile/` | GET | Get the content of a workspace file |
 
 

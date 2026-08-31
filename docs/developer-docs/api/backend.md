@@ -91,7 +91,7 @@ Retrieves conversation history
 
 ---
 
-### `GET /chats/{chat_id}/title`
+### `PUT /chats/{chat_id}/title`
 
 Updates the title of a specific chat
 
