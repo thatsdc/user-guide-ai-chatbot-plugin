@@ -15,8 +15,7 @@
     "@mui/icons-material": "^9.1.1",
     "@mui/material": "^9.1.1",
     "react": "^19.2.5",
-    "react-dom": "^19.2.5",
-    "remove-markdown": "^0.6.4"
+    "react-dom": "^19.2.5"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
