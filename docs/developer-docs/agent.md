@@ -2,6 +2,8 @@
 
 This document details the core orchestration engine of the agent. The system is built on **LangGraph**, utilizing a dual-LLM architecture that separates the reasoning/tool-calling process from the final user-facing response generation. 
 
+![Agent loop](../_static/images/agent-loop.png)
+
 ## 1. State Graph and Routing (`agent.py`)
 The agent's workflow is modeled as a state machine (`StateGraph`) handling the `MessagesState`. It relies on two distinct LLM clients (`ROUTER_LLM` and `FINAL_LLM`) to orchestrate the workflow safely and efficiently.
 

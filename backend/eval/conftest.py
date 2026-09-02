@@ -1,6 +1,24 @@
 import os
 import json
 from datetime import datetime
+import asyncio
+from manage_env import get_env
+import pytest
+
+
+EVAL_THROTTLE_SECONDS = get_env("EVAL_THROTTLE_SECONDS")
+
+@pytest.fixture(autouse=True)
+async def api_rate_limit_throttle():
+    """
+    Automatically introduces a delay after every test execution 
+    to prevent hitting API Requests limits.
+    """
+    yield 
+    
+    throttle_seconds = float(EVAL_THROTTLE_SECONDS) 
+    print(f"\n[Throttle] Waiting {throttle_seconds}s to respect API rate limits...")
+    await asyncio.sleep(throttle_seconds)
 
 
 def pytest_configure(config):
@@ -19,7 +37,8 @@ def pytest_configure(config):
 
 def pytest_sessionfinish(session, exitstatus):
     """
-    Calculates the averages and saves them as a JSON file.
+    Calculates the averages, stores all individual scores, 
+    and saves them as a JSON file.
     """
     report = {}
 
@@ -29,9 +48,16 @@ def pytest_sessionfinish(session, exitstatus):
     for metric_name, scores in scores_dict.items():
         if scores:
             average = sum(scores) / len(scores)
-            report[f"average_{metric_name}"] = round(average, 5)
+            # Grouping average and the full array under the metric name
+            report[metric_name] = {
+                "average": round(average, 5),
+                "all_scores": scores
+            }
         else:
-            report[f"average_{metric_name}"] = None
+            report[metric_name] = {
+                "average": None,
+                "all_scores": []
+            }
 
     report_dir = "test_reports"
     os.makedirs(report_dir, exist_ok=True)

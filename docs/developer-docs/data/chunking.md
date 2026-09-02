@@ -27,6 +27,10 @@ The chunking and retrieval strategy differs between sources:
 *   **`discourse_topics`** and **`reddit_threads`** (Parent-child retrieval): Chunked without overlap. At retrieval time, Parent-child Retrieval is applied. 
 *   **`code_blocks`**: When a code block is retrieved from the vector database, the related chunk is retrieved using `related_id`. Then, the *n* previous and *n* next chunks of the code block are retrieved; the same happens for the related chunk. Finally, the reconstructed code block is injected into the reconstructed related document.  
 
+![Chunking](../../_static/images/chunking.png)
+
+![Retrieval](../../_static/images/retrieval.png)
+
 ## Document Processing and Chunking
 
 These functions manage the core splitting logic and the overall orchestration of the document pipeline.
@@ -50,3 +54,5 @@ This module is responsible for enriching individual text chunks with broader doc
 
 *   **`contextualize_chunk`**: Utilizes an LLM to generate a brief (1-3 sentences) contextual summary for a specific chunk based on its parent document. It supports Anthropic-specific prompt caching for efficiency and prepends the generated context to the chunk using a `===CR===` separator.
 *   **`contextualize_chunk_list`**: Iterates through a provided list of chunk documents, reads the corresponding parent documents from the filesystem, and applies `contextualize_chunk` to update the content of each chunk in the list.
+
+![Contextual Retrieval](../../_static/images/contextual-retrieval.png)
