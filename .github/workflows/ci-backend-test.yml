@@ -31,8 +31,6 @@ jobs:
 
       - name: Run e2e tests
         working-directory: backend
-        env:
-          PYTHONPATH: ${{github.workspace}}/backend
         run: |
           uv run pytest tests/e2e
       - name: Run unit tests

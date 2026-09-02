@@ -7,12 +7,18 @@ from qdrant_client.http.models import Distance, SparseVectorParams, VectorParams
 from qdrant_client.conversions.common_types import PointId, Record
 from .manage_jwt import generate_admin_token
 from cachetools.func import ttl_cache
-from langchain_core.documents import Document
 
 load_dotenv()
 
 QDRANT_COLLECTION_NAME = get_env("QDRANT_COLLECTION_NAME")
 TTL_QDRANT_CACHE = 3600
+
+HUGGING_FACE_EMBEDDING_NAME = get_env("HUGGING_FACE_EMBEDDING_NAME")
+FAST_EMBED_SPARSE_MODEL_NAME = get_env("FAST_EMBED_SPARSE_MODEL_NAME")
+
+DENSE_EMBEDDINGS = HuggingFaceEmbeddings(model_name=HUGGING_FACE_EMBEDDING_NAME)
+SPARSE_EMBEDDINGS = FastEmbedSparse(model_name=FAST_EMBED_SPARSE_MODEL_NAME)
+EMBEDDING_SIZE = int(get_env("EMBEDDING_SIZE"))
 
 
 @ttl_cache(maxsize=1, ttl=TTL_QDRANT_CACHE - 1)
@@ -60,15 +66,7 @@ def get_vector_store():
     Returns a QdrantVectorStore instance, which is cached after the first function execution.
     Uses a Hybrid retriever with a Dense and Sparse Embedding. Result is cached for 3540 seconds.
     """
-
-    HUGGING_FACE_EMBEDDING_NAME = get_env("HUGGING_FACE_EMBEDDING_NAME")
-    EMBEDDING_SIZE = int(get_env("EMBEDDING_SIZE"))
-    FAST_EMBED_SPARSE_MODEL_NAME = get_env("FAST_EMBED_SPARSE_MODEL_NAME")
-
     qdrant_client = get_qdrant_client()
-
-    dense_embeddings = HuggingFaceEmbeddings(model_name=HUGGING_FACE_EMBEDDING_NAME)
-    sparse_embeddings = FastEmbedSparse(model_name=FAST_EMBED_SPARSE_MODEL_NAME)
 
     if not qdrant_client.collection_exists(QDRANT_COLLECTION_NAME):
         qdrant_client.create_collection(
@@ -86,8 +84,8 @@ def get_vector_store():
     vectorstore = QdrantVectorStore(
         client=qdrant_client,
         collection_name=QDRANT_COLLECTION_NAME,
-        embedding=dense_embeddings,
-        sparse_embedding=sparse_embeddings,
+        embedding=DENSE_EMBEDDINGS,
+        sparse_embedding=SPARSE_EMBEDDINGS,
         retrieval_mode=RetrievalMode.HYBRID,
         vector_name="dense",
         sparse_vector_name="sparse",

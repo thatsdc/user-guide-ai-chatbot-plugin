@@ -3,6 +3,7 @@ import { AnswerEntity, QuestionEntity } from "../../../../../models/models";
 import EditInput from "./EditInput";
 import { useState } from "react";
 import MessageActions from "./MessageActions";
+import removeMd from "remove-markdown";
 
 interface QuestionMessageProps {
   message: QuestionEntity;
@@ -58,6 +59,8 @@ export default function Message({
     setIsEditing(false);
   };
 
+  const cleanedResponse = message.content ? removeMd(message.content) : "";
+
   return (
     <Box
       className="message-row"
@@ -102,7 +105,7 @@ export default function Message({
                 }),
           })}
         >
-          {message.content}
+          {cleanedResponse}
         </Box>
       )}
 

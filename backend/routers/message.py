@@ -7,7 +7,7 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from fastapi.responses import StreamingResponse
 from sqlalchemy import update
-from agent.agent import execute_agent
+from agent.execute_agent import execute_agent
 import models
 import schemas
 import asyncio
